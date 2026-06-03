@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/* ── Theme tokens ──────────────────────────────────────────────── */
+:root {
+  --bg:             #05080F;
+  --bg-secondary:   #0D1320;
+  --country-fill:   #1a1e2a;
+  --country-stroke: #252a38;
+  --border-country: rgba(255,255,255,0.35);
+  --text-primary:   #ffffff;
+  --text-muted:     rgba(255,255,255,0.45);
+  --gradient-stop:  rgba(5,8,15,0.93);
+  --title-color:    #E8C84A;
+  --input-bg:       #0a0f1a;
+}
+
+[data-theme="light"] {
+  --bg:             #E8EDF8;
+  --bg-secondary:   #dde5f7;
+  --country-fill:   #c8d0e8;
+  --country-stroke: #9eacc8;
+  --border-country: rgba(0,0,0,0.18);
+  --text-primary:   #0d1230;
+  --text-muted:     rgba(13,18,48,0.52);
+  --gradient-stop:  rgba(232,237,248,0.95);
+  --title-color:    #1a3080;
+  --input-bg:       #cdd6ee;
+}
+
+/* ── Animations ────────────────────────────────────────────────── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes pulseRecord {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
+  50%       { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+}
+
+@keyframes playPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+@keyframes pixelPlaying {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(255,255,255,0.5)); }
+  50%       { filter: drop-shadow(0 0 8px rgba(255,255,255,0.95)); }
+}
+.pixel-playing { animation: pixelPlaying 0.7s ease-in-out infinite; }
+
+* { box-sizing: border-box; }
+body { margin: 0; overflow: hidden; }
+
+/* ── Number input: hide native arrows ─────────────────────────── */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
