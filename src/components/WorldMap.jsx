@@ -6,6 +6,7 @@ import franceData from '../data/france.json'
 import useMapStore from '../store/mapStore'
 
 const CELL = 4
+const BEBAS = "'Bebas Neue', Impact, sans-serif"
 
 const WORLD_FEATURES = topojson.feature(worldTopo, worldTopo.objects.countries).features
 
@@ -76,7 +77,6 @@ function buildGrid(projection, feature) {
 export default function WorldMap({ onCountryClick, onCountryHover }) {
   const svgRef          = useRef(null)
   const containerRef    = useRef(null)
-  // iso -> array[3] of D3 selections (one per tile), for France scale + pixel sync
   const groupsRef       = useRef({})
   const cellsGroupsRef  = useRef({})
   const projCentroidRef = useRef(null)
@@ -92,6 +92,7 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
 
   const pixelsByCountry = useMapStore(s => s.pixelsByCountry)
   const playingPixels   = useMapStore(s => s.playingPixels)
+  const pendingPixels   = useMapStore(s => s.pendingPixels)
   const frPixelCount = (pixelsByCountry.fr ?? []).length
   const frScale = 1 + frPixelCount * 0.0008
 
@@ -112,14 +113,10 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
       .fitExtent([[0, 0], [width, height]], WORLD_EXTENT)
     const pathGen = d3.geoPath().projection(projection)
 
-    // True tile width: Mercator maps longitude linearly, so 360° = 2π × scale pixels.
-    // This is NOT equal to `width` whenever fitExtent is height-constrained
-    // (e.g. 16:9 screens), which would otherwise leave a visible gap at the Pacific seam.
     const tileW = 2 * Math.PI * projection.scale()
 
     projCentroidRef.current = projection(d3.geoCentroid(franceData))
 
-    // Pre-compute cells for every qualified country ONCE — shared across all 3 tiles
     const precomputed = {}
     QUALIFIED.forEach(country => {
       const feature = country.iso === 'fr'
@@ -131,17 +128,11 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
       precomputed[country.iso] = { feature, cells }
     })
 
-    // ── 3 tiles: L(-1) C(0) R(+1)  ──────────────────────────────────────────
-    // Tiles are offset in g's local space by ±width.
-    // The zoom handler normalises tx to [0, tileW) and updates g's transform,
-    // so the left tile always covers the gap on the left and the right tile
-    // covers the gap on the right — seamless wrap at every zoom level.
     ;[-1, 0, 1].forEach(dx => {
       const suf  = dx === -1 ? 'L' : dx === 1 ? 'R' : 'C'
       const tile = g.append('g')
       if (dx !== 0) tile.attr('transform', `translate(${dx * tileW}, 0)`)
 
-      // Background (non-qualified) countries
       tile.selectAll('path.country')
         .data(WORLD_FEATURES.filter(f => !QUALIFIED_IDS.has(f.id)))
         .join('path')
@@ -152,7 +143,6 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
         .attr('stroke-width', 0.5)
         .attr('pointer-events', 'none')
 
-      // Qualified country overlays — same data, 3 visual copies
       QUALIFIED.forEach(country => {
         const pre = precomputed[country.iso]
         if (!pre) return
@@ -162,7 +152,6 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
         const bw = bx1 - bx
         const bh = by1 - by
 
-        // SVG IDs must be unique in the document — suffix per tile
         const flagId = `flag-${country.iso}-${suf}`
         const clipId = `clip-${country.iso}-${suf}`
 
@@ -172,7 +161,6 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
 
         const defs = cg.append('defs')
 
-        // Flag image pattern
         defs.append('pattern')
           .attr('id', flagId)
           .attr('patternUnits', 'userSpaceOnUse')
@@ -184,7 +172,6 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
           .attr('width', bw).attr('height', bh)
           .attr('preserveAspectRatio', 'xMidYMid slice')
 
-        // Flag territory fill
         cg.append('path')
           .datum(feature).attr('d', pathGen)
           .attr('fill', `url(#${flagId})`)
@@ -192,12 +179,9 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
           .attr('stroke', 'none')
           .attr('pointer-events', 'none')
 
-        // Clip path — confines the pixel grid to the country shape
         defs.append('clipPath').attr('id', clipId)
           .append('path').datum(feature).attr('d', pathGen)
 
-        // Pixel grid — present on ALL tiles so purchased pixels are visible
-        // when the country appears on a side copy
         const cellsGroup = cg.append('g').attr('clip-path', `url(#${clipId})`)
         if (!cellsGroupsRef.current[country.iso]) cellsGroupsRef.current[country.iso] = []
         cellsGroupsRef.current[country.iso].push(cellsGroup)
@@ -210,7 +194,6 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
           .attr('fill', 'transparent').attr('fill-opacity', 0)
           .attr('stroke', '#1a2a4a').attr('stroke-width', 0.5)
 
-        // Events on ALL tiles — hover/click work on every visible copy
         const { iso } = country
         cellsGroup
           .on('mouseover', function(event) {
@@ -220,12 +203,16 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
             callbacksRef.current.onCountryHover?.(country)
             svg.style('cursor', 'pointer')
             const occupied = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
+            const pending  = useMapStore.getState().pendingPixels.has(`${iso}:${d.id}`)
             if (occupied) {
               d3.select(event.target).attr('fill', '#FFE085').attr('fill-opacity', 1)
-              setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: '▶ ÉCOUTER' })
+              setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: 'ÉCOUTER' })
+            } else if (pending) {
+              d3.select(event.target).attr('fill', '#FFE085').attr('fill-opacity', 0.8)
+              setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: 'SÉLECTIONNÉ — CLIQUER POUR RETIRER' })
             } else {
               d3.select(event.target).attr('fill', '#E8C84A').attr('fill-opacity', 0.3)
-              setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: '+ PLACER MA VOIX' })
+              setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: 'PLACER MA VOIX' })
             }
           })
           .on('mouseout', function(event) {
@@ -235,9 +222,10 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
             setTooltip(null)
             svg.style('cursor', 'grab')
             const occupied = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
+            const pending  = useMapStore.getState().pendingPixels.has(`${iso}:${d.id}`)
             d3.select(event.target)
-              .attr('fill', occupied ? '#E8C84A' : 'transparent')
-              .attr('fill-opacity', occupied ? 0.9 : 0)
+              .attr('fill',         occupied ? '#E8C84A' : pending ? '#E8C84A' : 'transparent')
+              .attr('fill-opacity', occupied ? 0.9      : pending ? 0.5       : 0)
           })
           .on('click', function(event) {
             if (event.target.tagName !== 'rect') return
@@ -247,11 +235,11 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
             if (occupied) {
               useMapStore.getState().setClickedPixel(iso, d.id)
             } else {
+              useMapStore.getState().togglePendingPixel(iso, d.id)
               callbacksRef.current.onCountryClick?.(country)
             }
           })
 
-        // Country border
         cg.append('path').datum(feature).attr('d', pathGen)
           .attr('fill', 'none')
           .style('stroke', 'var(--border-country)')
@@ -260,24 +248,13 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
       })
     })
 
-    // ── Zoom ──────────────────────────────────────────────────────────────────
-    // Horizontal: raw tx unconstrained, normalised to [0, screenTileW) each frame.
-    //   screenTileW = tileW × k  (tileW = 2π × scale, computed above)
-    //   The three tiles (at offsets ±tileW in local space) always cover the
-    //   viewport — left tile fills the left gap, right tile fills the right gap.
-    //
-    // Vertical: clamped so the map always fills the screen in height.
-    //   ty ∈ [height × (1 - k), 0]
-    //
-    // __zoom is updated with the normalised transform so subsequent drag events
-    // build on the normalised position (prevents tx drift / float overflow).
     const zoom = d3.zoom()
       .scaleExtent([1, 8])
       .on('start', () => svg.style('cursor', 'grabbing'))
       .on('end',   () => svg.style('cursor', 'grab'))
       .on('zoom', function(event) {
         const t = event.transform
-        const screenTileW = tileW * t.k   // tileW captured from outer scope
+        const screenTileW = tileW * t.k
 
         const normTx = ((t.x % screenTileW) + screenTileW) % screenTileW
         const normTy = Math.min(0, Math.max(height * (1 - t.k), t.y))
@@ -296,7 +273,7 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  // ─── Sync purchased pixels + playing animation across ALL 3 tile copies ──
+  // ─── Sync purchased + pending + playing pixels across all 3 tile copies ──
   useEffect(() => {
     QUALIFIED.forEach(({ iso }) => {
       const pixels = pixelsByCountry[iso] ?? []
@@ -306,11 +283,21 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
       const groups = cellsGroupsRef.current[iso] ?? []
       groups.forEach(group => {
         group.selectAll('rect')
-          .attr('fill', d => ids.has(d.id) ? '#E8C84A' : 'transparent')
-          .attr('fill-opacity', d => ids.has(d.id) ? 0.9 : 0)
+          .attr('fill', d => {
+            if (ids.has(d.id))                           return '#E8C84A'
+            if (pendingPixels.has(`${iso}:${d.id}`))    return '#E8C84A'
+            return 'transparent'
+          })
+          .attr('fill-opacity', d => {
+            if (ids.has(d.id))                           return 0.9
+            if (pendingPixels.has(`${iso}:${d.id}`))    return 0.5
+            return 0
+          })
           .attr('stroke', d => {
             if (ids.has(d.id) && playingPixels.has(`${iso}:${d.id}`)) return '#ffffff'
-            return ids.has(d.id) ? '#E8C84A' : '#1a2a4a'
+            if (ids.has(d.id))                           return '#E8C84A'
+            if (pendingPixels.has(`${iso}:${d.id}`))    return '#E8C84A'
+            return '#1a2a4a'
           })
           .attr('stroke-width', d =>
             ids.has(d.id) && playingPixels.has(`${iso}:${d.id}`) ? 1.5 : 0.5
@@ -318,9 +305,9 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
           .classed('pixel-playing', d => ids.has(d.id) && playingPixels.has(`${iso}:${d.id}`))
       })
     })
-  }, [pixelsByCountry, playingPixels])
+  }, [pixelsByCountry, playingPixels, pendingPixels])
 
-  // ─── Scale France from its centroid — applied to all 3 tile copies ───────
+  // ─── Scale France from its centroid ───────────────────────────────────────
   useEffect(() => {
     const frGroups = groupsRef.current.fr ?? []
     if (frGroups.length === 0 || !projCentroidRef.current) return
@@ -331,6 +318,8 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
     })
   }, [frScale])
 
+  const pendingCount = pendingPixels.size
+
   return (
     <div
       ref={containerRef}
@@ -338,12 +327,34 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
     >
       <svg ref={svgRef} style={{ display: 'block' }} />
 
+      {/* Floating selection counter */}
+      {pendingCount > 0 && (
+        <div style={{
+          position: 'absolute',
+          bottom: 92,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(5,8,15,0.92)',
+          border: '1px solid #E8C84A',
+          color: '#E8C84A',
+          fontFamily: BEBAS,
+          fontSize: 16,
+          letterSpacing: 2,
+          padding: '9px 22px',
+          pointerEvents: 'none',
+          zIndex: 500,
+          whiteSpace: 'nowrap',
+        }}>
+          {pendingCount} PIXEL{pendingCount > 1 ? 'S' : ''} SÉLECTIONNÉ{pendingCount > 1 ? 'S' : ''} = {pendingCount}€
+        </div>
+      )}
+
       {tooltip && (
         <div style={{
           position: 'fixed', left: tooltip.x, top: tooltip.y,
           background: 'rgba(5,8,15,0.95)', border: '1px solid #E8C84A',
           color: '#E8C84A', fontSize: 12, fontFamily: "'DM Mono', monospace",
-          padding: '4px 8px', pointerEvents: 'none', maxWidth: 200, zIndex: 100,
+          padding: '4px 8px', pointerEvents: 'none', maxWidth: 260, zIndex: 100,
         }}>
           {tooltip.message}
         </div>

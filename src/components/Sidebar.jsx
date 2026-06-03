@@ -1,24 +1,28 @@
 import { useState, useEffect, useRef } from 'react'
 import useMapStore from '../store/mapStore'
+import useAuthStore from '../store/authStore'
 
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
 
-export default function Sidebar({ country, onClose }) {
-  const [pixelCount, setPixelCount] = useState('')
-  const [recState, setRecState]     = useState('idle')
-  const [timeLeft, setTimeLeft]     = useState(30)
-  const [isPlaying, setIsPlaying]   = useState(false)
-  const [isLight, setIsLight]       = useState(
+export default function Sidebar({ country, onClose, onNeedAuth }) {
+  const [recState, setRecState] = useState('idle')
+  const [timeLeft, setTimeLeft] = useState(30)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isLight, setIsLight] = useState(
     () => document.documentElement.getAttribute('data-theme') === 'light'
   )
   const playTimerRef = useRef(null)
   const timerRef     = useRef(null)
 
   const pixelsByCountry = useMapStore(s => s.pixelsByCountry)
+  const pendingPixels   = useMapStore(s => s.pendingPixels)
   const currentPixels   = (pixelsByCountry[country?.iso] ?? []).length
+  const pendingCount    = pendingPixels.size
 
-  // Mirror theme changes from HUD (observes the data-theme attribute on <html>)
+  const isLoggedIn = useAuthStore(s => s.isLoggedIn)
+
+  // Mirror theme changes from HUD
   useEffect(() => {
     const obs = new MutationObserver(() =>
       setIsLight(document.documentElement.getAttribute('data-theme') === 'light')
@@ -27,11 +31,10 @@ export default function Sidebar({ country, onClose }) {
     return () => obs.disconnect()
   }, [])
 
-  // Reset form when a different country opens the sidebar
+  // Reset recording state when a different country opens the sidebar
   useEffect(() => {
     clearTimeout(playTimerRef.current)
     clearInterval(timerRef.current)
-    setPixelCount('')
     setRecState('idle')
     setTimeLeft(30)
     setIsPlaying(false)
@@ -42,7 +45,7 @@ export default function Sidebar({ country, onClose }) {
     clearInterval(timerRef.current)
   }, [])
 
-  // setInterval countdown — starts when recording, cleans up when state changes
+  // Countdown tick
   useEffect(() => {
     if (recState !== 'recording') return
     const id = setInterval(() => setTimeLeft(t => Math.max(0, t - 1)), 1000)
@@ -50,13 +53,21 @@ export default function Sidebar({ country, onClose }) {
     return () => clearInterval(id)
   }, [recState])
 
-  // Transition to review when countdown reaches 0
+  // Auto-stop when countdown reaches 0
   useEffect(() => {
     if (recState === 'recording' && timeLeft === 0) setRecState('review')
   }, [recState, timeLeft])
 
-  const handleRecord = () => {
-    if (recState !== 'idle') return
+  const handleStartRecording = () => {
+    if (recState !== 'idle' || pendingCount === 0) return
+    if (!isLoggedIn) {
+      onNeedAuth?.(() => setRecState('ready'))
+      return
+    }
+    setRecState('ready')
+  }
+
+  const handleBeginRecording = () => {
     setTimeLeft(30)
     setRecState('recording')
   }
@@ -77,25 +88,22 @@ export default function Sidebar({ country, onClose }) {
     clearInterval(timerRef.current)
     setIsPlaying(false)
     setTimeLeft(30)
-    setRecState('idle')
+    setRecState('ready')
   }
 
   const handleValidate = () => setRecState('validated')
   const handleBack     = () => setRecState('review')
 
-  const handleConfirm = () => {
-    if (!canConfirm || !country) return
-    useMapStore.getState().confirmPurchase(country.iso, numPixels, '🎙 Message vocal')
+  const handleCommit = () => {
+    if (!country || recState !== 'validated' || pendingCount === 0) return
+    useMapStore.getState().commitPendingPixels('🎙 Message vocal')
     onClose()
   }
 
   if (!country) return null
 
   const progressPct = (timeLeft / 30) * 100
-  const numPixels   = parseInt(pixelCount) || 0
-  const canConfirm  = recState === 'validated' && numPixels > 0
 
-  // Theme-derived style tokens
   const accent     = isLight ? '#1a3080' : '#E8C84A'
   const sidebarBg  = isLight ? '#ffffff' : 'var(--bg-secondary)'
   const mutedColor = isLight ? 'rgba(26,48,128,0.6)' : 'var(--text-muted)'
@@ -103,8 +111,10 @@ export default function Sidebar({ country, onClose }) {
   const btnBg      = isLight ? '#1a3080' : 'rgba(255,255,255,0.04)'
   const btnBorder  = isLight ? '#1a3080' : 'rgba(255,255,255,0.1)'
   const btnColor   = isLight ? '#ffffff' : 'var(--text-muted)'
-  const inputBg    = isLight ? '#f0f4ff' : 'var(--input-bg)'
   const shadow     = isLight ? '0 2px 12px rgba(0,0,0,0.15)' : 'none'
+
+  const confirmActive = recState === 'idle' && pendingCount > 0
+  const commitActive  = recState === 'validated' && pendingCount > 0
 
   return (
     <div style={{
@@ -118,16 +128,16 @@ export default function Sidebar({ country, onClose }) {
       overflowY: 'auto',
     }}>
 
-      {/* Close */}
+      {/* Close — top left, away from HUD buttons */}
       <button onClick={onClose} style={{
-        position: 'absolute', top: 16, right: 18,
+        position: 'absolute', top: 16, left: 18,
         background: 'none', border: 'none',
         color: mutedColor, fontSize: 20,
         cursor: 'pointer', lineHeight: 1, padding: 6, fontFamily: MONO,
       }}>✕</button>
 
       {/* Country header */}
-      <div style={{ padding: '36px 28px 20px' }}>
+      <div style={{ padding: '36px 28px 20px', paddingLeft: 52 }}>
         <div style={{ fontSize: 52, lineHeight: 1, marginBottom: 10 }}>{country.flag}</div>
         <div style={{ fontFamily: BEBAS, fontSize: 32, color: accent, letterSpacing: 2 }}>
           {country.name}
@@ -139,75 +149,48 @@ export default function Sidebar({ country, onClose }) {
 
       <div style={{ height: 1, background: dividerClr, margin: '0 28px' }} />
 
-      {/* Pixel count */}
-      <div style={{ padding: '18px 28px 0' }}>
-        <div style={{ fontFamily: MONO, color: mutedColor, fontSize: 11, letterSpacing: 1.5, marginBottom: 10 }}>
-          NOMBRE DE PIXELS — 1€ / PIXEL
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input
-            type="number"
-            min={0}
-            value={pixelCount}
-            placeholder="?"
-            onChange={e => setPixelCount(
-              e.target.value === '' ? '' : String(Math.max(0, parseInt(e.target.value) || 0))
-            )}
-            style={{
-              flex: 1,
-              background: inputBg,
-              border: `1px solid ${accent}`,
-              color: accent,
-              textAlign: 'center',
-              fontFamily: BEBAS,
-              fontSize: 52,
-              padding: '8px 0',
-              borderRadius: 2,
-              outline: 'none',
-              display: 'block',
-              boxShadow: shadow,
-            }}
-          />
-          {pixelCount !== '' && (
-            <button
-              onClick={() => setPixelCount('')}
-              style={{
-                background: 'none',
-                border: `1px solid ${isLight ? 'rgba(26,48,128,0.3)' : 'rgba(255,255,255,0.15)'}`,
-                color: mutedColor,
-                fontSize: 16,
-                cursor: 'pointer',
-                borderRadius: 2,
-                padding: '4px 10px',
-                lineHeight: 1,
-                fontFamily: MONO,
-              }}
-            >×</button>
-          )}
-        </div>
-        <div style={{ fontFamily: MONO, color: mutedColor, fontSize: 14, marginTop: 6, textAlign: 'center' }}>
-          = <span style={{ color: accent, fontWeight: 500 }}>{numPixels}€</span>
-        </div>
-      </div>
-
-      <div style={{ height: 1, background: dividerClr, margin: '20px 28px' }} />
-
       {/* ── Recording section ── */}
-      <div style={{ padding: '0 28px' }}>
+      <div style={{ padding: '18px 28px 0' }}>
 
-        {/* IDLE */}
+        {/* IDLE — selection status */}
         {recState === 'idle' && (
-          <button onClick={handleRecord} style={{
-            width: '100%', padding: '13px 16px',
-            background: btnBg,
-            border: `1px solid ${btnBorder}`,
-            color: btnColor,
-            fontFamily: MONO, fontSize: 11, letterSpacing: 1.5,
-            cursor: 'pointer', borderRadius: 2,
-            boxShadow: shadow,
+          <div style={{
+            fontFamily: MONO, fontSize: 11, letterSpacing: 1,
+            color: pendingCount > 0 ? accent : mutedColor,
+            textAlign: 'center',
+            padding: '12px 0',
+            lineHeight: 1.6,
           }}>
-            🎙 ENREGISTREMENT
-          </button>
+            {pendingCount > 0
+              ? <>
+                  <span style={{ fontSize: 22, fontFamily: BEBAS, display: 'block', letterSpacing: 2, marginBottom: 2 }}>
+                    {pendingCount} PIXEL{pendingCount > 1 ? 'S' : ''} SÉLECTIONNÉ{pendingCount > 1 ? 'S' : ''}
+                  </span>
+                  Cliquez sur d'autres pixels pour en ajouter,<br />
+                  ou sur un pixel doré pour le retirer.
+                </>
+              : 'Cliquez sur les pixels vides de la carte\npour les sélectionner.'
+            }
+          </div>
+        )}
+
+        {/* READY — attend le clic de l'utilisateur pour démarrer */}
+        {recState === 'ready' && (
+          <div style={{ textAlign: 'center', padding: '14px 0' }}>
+            <button onClick={handleBeginRecording} style={{
+              width: '100%', padding: '15px 0',
+              background: 'rgba(29,185,84,0.08)',
+              border: '1px solid rgba(29,185,84,0.45)',
+              color: '#1DB954',
+              fontFamily: MONO, fontSize: 13, letterSpacing: 2,
+              cursor: 'pointer', borderRadius: 2,
+            }}>
+              🎙 ENREGISTRER
+            </button>
+            <div style={{ fontFamily: MONO, color: mutedColor, fontSize: 10, marginTop: 10, letterSpacing: 1 }}>
+              Appuyez pour démarrer le chrono de 30s
+            </div>
+          </div>
         )}
 
         {/* RECORDING */}
@@ -316,40 +299,61 @@ export default function Sidebar({ country, onClose }) {
         )}
       </div>
 
-      {/* ── Confirm — pinned to bottom ── */}
+      {/* ── Bottom — pinned confirm button ── */}
       <div style={{ marginTop: 'auto', padding: '20px 28px 32px' }}>
-        {!canConfirm && (
-          <div style={{ fontFamily: MONO, color: mutedColor, fontSize: 10, letterSpacing: 1, textAlign: 'center', marginBottom: 10, opacity: 0.7 }}>
-            {recState === 'idle'
-              ? 'Enregistrez un message pour continuer'
-              : recState === 'recording'
-              ? 'Enregistrement en cours...'
-              : recState === 'validated' && numPixels === 0
-              ? 'Entrez un nombre de pixels'
-              : 'Validez votre message pour continuer'}
+
+        {/* Idle + no pixels: hint */}
+        {recState === 'idle' && pendingCount === 0 && (
+          <div style={{
+            fontFamily: MONO, color: mutedColor, fontSize: 10,
+            letterSpacing: 1, textAlign: 'center', marginBottom: 10, opacity: 0.7,
+          }}>
+            Sélectionnez au moins 1 pixel sur la carte
           </div>
         )}
-        <button
-          onClick={handleConfirm}
-          disabled={!canConfirm}
-          style={{
-            width: '100%', padding: '15px 20px',
-            background: canConfirm
-              ? (isLight
-                  ? 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)'
-                  : 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)')
-              : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${canConfirm ? accent : 'rgba(255,255,255,0.07)'}`,
-            color: canConfirm ? (isLight ? '#ffffff' : '#05080F') : mutedColor,
-            fontFamily: BEBAS, fontSize: 18, letterSpacing: 3,
-            cursor: canConfirm ? 'pointer' : 'not-allowed',
-            borderRadius: 2,
-            transition: 'all 0.25s',
-            boxShadow: canConfirm ? shadow : 'none',
-          }}
-        >
-          CONFIRMER L'ACHAT
-        </button>
+
+        {/* Idle + pixels selected → start recording */}
+        {confirmActive && (
+          <button
+            onClick={handleStartRecording}
+            style={{
+              width: '100%', padding: '15px 20px',
+              background: isLight
+                ? 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)'
+                : 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)',
+              border: 'none',
+              color: isLight ? '#ffffff' : '#05080F',
+              fontFamily: BEBAS, fontSize: 17, letterSpacing: 3,
+              cursor: 'pointer', borderRadius: 2,
+              transition: 'all 0.25s',
+              boxShadow: shadow,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            CONFIRMER {pendingCount} PIXEL{pendingCount > 1 ? 'S' : ''} — {pendingCount}€
+          </button>
+        )}
+
+        {/* Validated + pixels → final commit */}
+        {commitActive && (
+          <button
+            onClick={handleCommit}
+            style={{
+              width: '100%', padding: '15px 20px',
+              background: isLight
+                ? 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)'
+                : 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)',
+              border: 'none',
+              color: isLight ? '#ffffff' : '#05080F',
+              fontFamily: BEBAS, fontSize: 17, letterSpacing: 3,
+              cursor: 'pointer', borderRadius: 2,
+              transition: 'all 0.25s',
+              boxShadow: shadow,
+            }}
+          >
+            CONFIRMER L'ACHAT
+          </button>
+        )}
       </div>
     </div>
   )

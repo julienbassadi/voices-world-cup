@@ -16,6 +16,38 @@ const useMapStore = create((set, get) => ({
   clickedPixel: null,
   setClickedPixel: (iso, pixelId) => set({ clickedPixel: { iso, pixelId, ts: Date.now() } }),
 
+  // ── Pending pixels — selected by user, not yet confirmed ─────────────────
+  pendingPixels: new Set(),  // Set<"iso:cellId">
+
+  togglePendingPixel: (iso, cellId) =>
+    set(state => {
+      const key  = `${iso}:${cellId}`
+      const next = new Set(state.pendingPixels)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return { pendingPixels: next }
+    }),
+
+  clearPendingPixels: () => set({ pendingPixels: new Set() }),
+
+  commitPendingPixels: (message) =>
+    set(state => {
+      const newPbc = { ...state.pixelsByCountry }
+      for (const key of state.pendingPixels) {
+        const sep  = key.indexOf(':')
+        const iso  = key.slice(0, sep)
+        const cId  = key.slice(sep + 1)
+        const cell = (state.cellsByCountry[iso] ?? []).find(c => c.id === cId)
+        if (!cell) continue
+        if (!newPbc[iso]) newPbc[iso] = []
+        newPbc[iso] = [
+          ...newPbc[iso],
+          { id: cId, lat: cell.lat, lng: cell.lng, userId: null, message },
+        ]
+      }
+      return { pixelsByCountry: newPbc, pendingPixels: new Set() }
+    }),
+
   addPixel: (countryId, pixel) =>
     set((state) => ({
       pixelsByCountry: {
@@ -28,25 +60,6 @@ const useMapStore = create((set, get) => ({
     set((state) => ({
       cellsByCountry: { ...state.cellsByCountry, [countryId]: cells },
     })),
-
-  confirmPurchase: (countryId, count, message) => {
-    const state = get()
-    const cells = state.cellsByCountry[countryId] ?? []
-    const occupied = new Set((state.pixelsByCountry[countryId] ?? []).map(p => p.id))
-    const available = cells.filter(c => !occupied.has(c.id))
-    const toAdd = available.slice(0, count)
-    if (toAdd.length === 0) return 0
-    set((s) => ({
-      pixelsByCountry: {
-        ...s.pixelsByCountry,
-        [countryId]: [
-          ...(s.pixelsByCountry[countryId] ?? []),
-          ...toAdd.map(c => ({ id: c.id, lat: c.lat, lng: c.lng, userId: null, message })),
-        ],
-      },
-    }))
-    return toAdd.length
-  },
 
   getPixelCount: (countryId) =>
     (get().pixelsByCountry[countryId] ?? []).length,

@@ -61,7 +61,7 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar }) {
   const bottomBg = isDark ? 'rgba(5,8,15,0.93)' : 'rgba(232,237,248,0.95)'
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, pointerEvents: 'none' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, pointerEvents: 'none' }}>
 
       {/* ── Left panel: logo + full ranking (scrollable) ── */}
       <div style={{
