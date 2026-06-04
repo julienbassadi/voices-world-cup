@@ -4,6 +4,11 @@ import useMapStore from '../store/mapStore'
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
 
+const LIGHT_TEXT   = '#1a2040'
+const DARK_TEXT    = '#F0F0F0'
+const DARK_MUTED   = 'rgba(255,255,255,0.5)'
+const LIGHT_MUTED  = 'rgba(26,48,128,0.6)'
+
 function renderDescription(text) {
   if (!text) return null
   const parts = []
@@ -29,13 +34,13 @@ export default function VocalSpace({ country, pixel, onClose }) {
   const [isLight, setIsLight] = useState(
     () => document.documentElement.getAttribute('data-theme') === 'light'
   )
-  const [comments, setComments]       = useState([])
-  const [newComment, setNewComment]   = useState('')
+  const [comments, setComments]         = useState([])
+  const [newComment, setNewComment]     = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isPlaying, setIsPlaying]     = useState(false)
-  const [likes, setLikes]             = useState(pixel.likes ?? 0)
-  const [hasLiked, setHasLiked]       = useState(false)
-  const [isLiking, setIsLiking]       = useState(false)
+  const [isPlaying, setIsPlaying]       = useState(false)
+  const [likes, setLikes]               = useState(pixel.likes ?? 0)
+  const [hasLiked, setHasLiked]         = useState(false)
+  const [isLiking, setIsLiking]         = useState(false)
   const audioRef = useRef(null)
 
   const likeKey    = `liked_pixel_${pixel.id}`
@@ -62,13 +67,20 @@ export default function VocalSpace({ country, pixel, onClose }) {
   }
 
   async function handleLike() {
-    if (hasLiked || isLiking) return
+    if (isLiking) return
     setIsLiking(true)
     try {
-      await useMapStore.getState().likePixel(pixel.id)
-      setLikes(l => l + 1)
-      setHasLiked(true)
-      localStorage.setItem(likeKey, '1')
+      if (hasLiked) {
+        await useMapStore.getState().unlikePixel(pixel.id)
+        setLikes(l => Math.max(0, l - 1))
+        setHasLiked(false)
+        localStorage.removeItem(likeKey)
+      } else {
+        await useMapStore.getState().likePixel(pixel.id)
+        setLikes(l => l + 1)
+        setHasLiked(true)
+        localStorage.setItem(likeKey, '1')
+      }
     } catch (e) { console.error(e) }
     finally { setIsLiking(false) }
   }
@@ -97,12 +109,13 @@ export default function VocalSpace({ country, pixel, onClose }) {
     finally { setIsSubmitting(false) }
   }
 
+  const text       = isLight ? LIGHT_TEXT  : DARK_TEXT
+  const muted      = isLight ? LIGHT_MUTED : DARK_MUTED
   const accent     = pixelColor
   const sidebarBg  = isLight ? '#ffffff' : 'var(--bg-secondary)'
-  const mutedColor = isLight ? 'rgba(26,48,128,0.6)' : 'var(--text-muted)'
-  const dividerClr = isLight ? 'rgba(26,48,128,0.12)' : `${pixelColor}22`
-  const btnBg      = isLight ? '#f4f6fb' : 'rgba(255,255,255,0.04)'
-  const btnBorder  = isLight ? 'rgba(26,48,128,0.15)' : 'rgba(255,255,255,0.1)'
+  const dividerClr = isLight ? 'rgba(26,48,128,0.12)' : `${pixelColor}28`
+  const inputBg    = isLight ? 'rgba(26,48,128,0.06)' : 'rgba(255,255,255,0.06)'
+  const inputBdr   = isLight ? 'rgba(26,48,128,0.18)' : 'rgba(255,255,255,0.12)'
   const shadow     = isLight ? '0 2px 12px rgba(0,0,0,0.15)' : 'none'
 
   return (
@@ -121,7 +134,7 @@ export default function VocalSpace({ country, pixel, onClose }) {
       <button onClick={onClose} style={{
         position: 'absolute', top: 16, left: 18,
         background: 'none', border: 'none',
-        color: mutedColor, fontSize: 20,
+        color: muted, fontSize: 20,
         cursor: 'pointer', lineHeight: 1, padding: 6, fontFamily: MONO,
       }}>✕</button>
 
@@ -131,7 +144,7 @@ export default function VocalSpace({ country, pixel, onClose }) {
         <div style={{ fontFamily: BEBAS, fontSize: 32, color: accent, letterSpacing: 2 }}>
           {country.name}
         </div>
-        <div style={{ fontFamily: MONO, color: mutedColor, fontSize: 10, marginTop: 4, letterSpacing: 1 }}>
+        <div style={{ fontFamily: MONO, color: muted, fontSize: 10, marginTop: 4, letterSpacing: 1 }}>
           ESPACE VOCAL
         </div>
       </div>
@@ -140,7 +153,7 @@ export default function VocalSpace({ country, pixel, onClose }) {
 
       {/* Buyer info */}
       <div style={{ padding: '18px 28px 0' }}>
-        <div style={{ fontFamily: MONO, fontSize: 9, color: mutedColor, letterSpacing: 2, marginBottom: 6 }}>
+        <div style={{ fontFamily: MONO, fontSize: 9, color: muted, letterSpacing: 2, marginBottom: 6 }}>
           VOIX DE
         </div>
         <div style={{ fontFamily: BEBAS, fontSize: 22, color: accent, letterSpacing: 1, marginBottom: 10 }}>
@@ -149,10 +162,10 @@ export default function VocalSpace({ country, pixel, onClose }) {
 
         {pixel.description && (
           <div style={{
-            fontFamily: MONO, fontSize: 11, color: isLight ? '#222' : 'var(--text)',
+            fontFamily: MONO, fontSize: 11, color: text,
             lineHeight: 1.7, marginBottom: 18,
             padding: '10px 12px',
-            background: `${accent}0D`,
+            background: `${accent}12`,
             borderLeft: `2px solid ${accent}55`,
             whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           }}>
@@ -174,29 +187,29 @@ export default function VocalSpace({ country, pixel, onClose }) {
           </button>
         )}
 
-        {/* Likes */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        {/* Likes — toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <button
             onClick={handleLike}
-            disabled={hasLiked || isLiking}
+            disabled={isLiking}
+            title={hasLiked ? 'Retirer mon like' : 'Aimer cette voix'}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: hasLiked ? 'rgba(239,68,68,0.1)' : btnBg,
-              border: `1px solid ${hasLiked ? 'rgba(239,68,68,0.45)' : btnBorder}`,
-              color: hasLiked ? '#EF4444' : mutedColor,
-              fontFamily: MONO, fontSize: 12, letterSpacing: 1,
-              padding: '7px 14px', cursor: hasLiked ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: hasLiked ? 'rgba(239,68,68,0.12)' : inputBg,
+              border: `1px solid ${hasLiked ? 'rgba(239,68,68,0.5)' : inputBdr}`,
+              color: hasLiked ? '#FF6B6B' : text,
+              fontFamily: BEBAS, fontSize: 16, letterSpacing: 1,
+              padding: '8px 16px', cursor: isLiking ? 'wait' : 'pointer',
               borderRadius: 2, transition: 'all 0.2s', boxShadow: shadow,
+              opacity: isLiking ? 0.6 : 1,
             }}
           >
-            <span style={{ fontSize: 14 }}>{hasLiked ? '❤️' : '🤍'}</span>
-            <span>{likes}</span>
+            <span style={{ fontSize: 16, lineHeight: 1 }}>{hasLiked ? '❤️' : '🤍'}</span>
+            <span style={{ minWidth: 20, textAlign: 'left' }}>{likes}</span>
           </button>
-          {hasLiked && (
-            <span style={{ fontFamily: MONO, fontSize: 9, color: mutedColor, letterSpacing: 1 }}>
-              VOUS AVEZ AIMÉ
-            </span>
-          )}
+          <span style={{ fontFamily: MONO, fontSize: 9, color: muted, letterSpacing: 1 }}>
+            {hasLiked ? 'VOUS AVEZ AIMÉ' : 'J\'AIME'}
+          </span>
         </div>
       </div>
 
@@ -209,7 +222,7 @@ export default function VocalSpace({ country, pixel, onClose }) {
         </div>
 
         {comments.length === 0 && (
-          <div style={{ fontFamily: MONO, fontSize: 10, color: mutedColor, marginBottom: 14, opacity: 0.8 }}>
+          <div style={{ fontFamily: MONO, fontSize: 10, color: muted, marginBottom: 14, opacity: 0.8 }}>
             Aucun commentaire. Soyez le premier !
           </div>
         )}
@@ -222,12 +235,12 @@ export default function VocalSpace({ country, pixel, onClose }) {
               borderLeft: `2px solid ${accent}33`,
             }}>
               <div style={{
-                fontFamily: MONO, fontSize: 11, color: isLight ? '#222' : 'var(--text)',
+                fontFamily: MONO, fontSize: 11, color: text,
                 lineHeight: 1.6, wordBreak: 'break-word',
               }}>
                 {c.content}
               </div>
-              <div style={{ fontFamily: MONO, fontSize: 9, color: mutedColor, marginTop: 4 }}>
+              <div style={{ fontFamily: MONO, fontSize: 9, color: muted, marginTop: 4 }}>
                 {new Date(c.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
               </div>
             </div>
@@ -240,11 +253,12 @@ export default function VocalSpace({ country, pixel, onClose }) {
           placeholder="Laisser un commentaire…"
           rows={3}
           maxLength={500}
+          className="vocal-space-input"
           style={{
             width: '100%', boxSizing: 'border-box',
-            background: isLight ? 'rgba(26,48,128,0.04)' : 'rgba(255,255,255,0.04)',
-            border: `1px solid ${btnBorder}`,
-            color: isLight ? '#111' : 'var(--text)',
+            background: inputBg,
+            border: `1px solid ${inputBdr}`,
+            color: text,
             fontFamily: MONO, fontSize: 11, padding: '9px 12px',
             borderRadius: 2, resize: 'none', outline: 'none',
             marginBottom: 8, lineHeight: 1.6,
@@ -256,8 +270,8 @@ export default function VocalSpace({ country, pixel, onClose }) {
           style={{
             width: '100%', padding: '11px 0',
             background: newComment.trim() ? `${accent}14` : 'transparent',
-            border: `1px solid ${newComment.trim() ? `${accent}55` : btnBorder}`,
-            color: newComment.trim() ? accent : mutedColor,
+            border: `1px solid ${newComment.trim() ? `${accent}55` : inputBdr}`,
+            color: newComment.trim() ? accent : muted,
             fontFamily: MONO, fontSize: 11, letterSpacing: 2,
             cursor: newComment.trim() && !isSubmitting ? 'pointer' : 'default',
             borderRadius: 2, transition: 'all 0.2s', boxShadow: shadow,

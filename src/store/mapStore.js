@@ -146,6 +146,11 @@ const useMapStore = create((set, get) => ({
     if (error) throw new Error(error.message)
   },
 
+  unlikePixel: async (pixelId) => {
+    const { error } = await supabase.rpc('decrement_pixel_likes', { p_id: pixelId })
+    if (error) throw new Error(error.message)
+  },
+
   // ── Comments ──────────────────────────────────────────────────────────────
 
   loadComments: async (pixelId) => {
