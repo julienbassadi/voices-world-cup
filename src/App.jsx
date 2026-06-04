@@ -1,15 +1,17 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import WorldMap from './components/WorldMap'
+import WorldMap, { QUALIFIED } from './components/WorldMap'
 import Sidebar from './components/Sidebar'
 import HUD from './components/HUD'
 import AudioLayer from './components/AudioLayer'
 import Auth from './components/Auth'
+import PixelModal from './components/PixelModal'
 import useMapStore from './store/mapStore'
 
 export default function App() {
   const [selectedCountry, setSelectedCountry]     = useState(null)
   const [lastHoveredCountry, setLastHoveredCountry] = useState(null)
   const [showAuth, setShowAuth]                   = useState(false)
+  const [pixelModal, setPixelModal]               = useState(null) // { country, pixel }
   const authCallbackRef                           = useRef(null)
 
   useEffect(() => {
@@ -19,6 +21,11 @@ export default function App() {
 
   const handleCountryClick = useCallback(country => setSelectedCountry(country), [])
   const handleCountryHover = useCallback(country => setLastHoveredCountry(country), [])
+
+  const handlePixelDoubleClick = useCallback(({ iso, pixel }) => {
+    const country = QUALIFIED.find(c => c.iso === iso)
+    if (country && pixel) setPixelModal({ country, pixel })
+  }, [])
 
   const handleCloseSidebar = useCallback(() => {
     setSelectedCountry(null)
@@ -30,8 +37,6 @@ export default function App() {
     [lastHoveredCountry]
   )
 
-  // Called by Sidebar when user needs to log in before proceeding.
-  // cb = what to run after successful auth (e.g. start recording).
   const handleNeedAuth = useCallback((cb) => {
     authCallbackRef.current = cb
     setShowAuth(true)
@@ -54,6 +59,7 @@ export default function App() {
       <WorldMap
         onCountryClick={handleCountryClick}
         onCountryHover={handleCountryHover}
+        onPixelDoubleClick={handlePixelDoubleClick}
       />
       <HUD
         lastHoveredCountry={lastHoveredCountry}
@@ -69,6 +75,13 @@ export default function App() {
         <Auth
           onClose={handleAuthClose}
           onSuccess={handleAuthSuccess}
+        />
+      )}
+      {pixelModal && (
+        <PixelModal
+          country={pixelModal.country}
+          pixel={pixelModal.pixel}
+          onClose={() => setPixelModal(null)}
         />
       )}
     </div>

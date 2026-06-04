@@ -2,6 +2,18 @@ import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import useAuthStore from './authStore'
 
+const mapPixel = p => ({
+  id: p.id,
+  lat: p.x,
+  lng: p.y,
+  userId: p.user_id,
+  audioUrl: p.audio_url,
+  pseudo: p.pseudo ?? null,
+  description: p.description ?? null,
+  color: p.color ?? null,
+  likes: p.likes ?? 0,
+})
+
 const useMapStore = create((set, get) => ({
   pixelsByCountry: {},
   cellsByCountry: {},
@@ -51,7 +63,7 @@ const useMapStore = create((set, get) => ({
     const pbc = {}
     for (const p of pixelsRes.data) {
       if (!pbc[p.country_iso]) pbc[p.country_iso] = []
-      pbc[p.country_iso].push({ id: p.id, lat: p.x, lng: p.y, userId: p.user_id, audioUrl: p.audio_url })
+      pbc[p.country_iso].push(mapPixel(p))
     }
     set({ pixelsByCountry: pbc, totalVoices: countRes.count ?? 0 })
   },
@@ -62,9 +74,8 @@ const useMapStore = create((set, get) => ({
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pixels' }, ({ new: p }) => {
         set(state => {
           const existing = state.pixelsByCountry[p.country_iso] ?? []
-          // Pixel already added locally by addPixels — skip map update but don't double-count
           if (existing.some(px => px.id === p.id)) return state
-          const pixel = { id: p.id, lat: p.x, lng: p.y, userId: p.user_id, audioUrl: p.audio_url }
+          const pixel = mapPixel(p)
           return {
             totalVoices: state.totalVoices + 1,
             pixelsByCountry: {
@@ -78,21 +89,23 @@ const useMapStore = create((set, get) => ({
     return () => supabase.removeChannel(channel)
   },
 
-  addPixels: async (countryIso, pixelsArray, audioUrl = null) => {
+  addPixels: async (countryIso, pixelsArray, { audioUrl, pseudo, description, color } = {}) => {
     const userId = useAuthStore.getState().user?.id
     const rows = pixelsArray.map(cell => ({
       user_id: userId,
       country_iso: countryIso,
       x: cell.lat,
       y: cell.lng,
-      audio_url: audioUrl,
+      audio_url: audioUrl ?? null,
+      pseudo: pseudo ?? null,
+      description: description ?? null,
+      color: color ?? null,
     }))
     const { data, error } = await supabase.from('pixels').insert(rows).select()
     if (error) {
       throw new Error(`Insertion pixels échouée : ${error.message}`)
     }
-    const newPixels = data.map(p => ({ id: p.id, lat: p.x, lng: p.y, userId: p.user_id, audioUrl: p.audio_url }))
-    // Increment totalVoices here; subscription will deduplicate and not increment again
+    const newPixels = data.map(mapPixel)
     set(state => ({
       totalVoices: state.totalVoices + newPixels.length,
       pixelsByCountry: {
@@ -102,7 +115,7 @@ const useMapStore = create((set, get) => ({
     }))
   },
 
-  commitPendingPixels: async (audioUrl = null) => {
+  commitPendingPixels: async ({ audioUrl, pseudo, description, color } = {}) => {
     const { pendingPixels, cellsByCountry } = get()
     const byCountry = {}
     for (const key of pendingPixels) {
@@ -118,12 +131,38 @@ const useMapStore = create((set, get) => ({
       throw new Error('Aucune cellule valide trouvée dans pendingPixels. Les cellules sont-elles bien chargées ?')
     }
     for (const [iso, cells] of Object.entries(byCountry)) {
-      await get().addPixels(iso, cells, audioUrl)
+      await get().addPixels(iso, cells, { audioUrl, pseudo, description, color })
     }
     set(state => ({
       pendingPixels: new Set(),
       confirmedPixels: new Set([...state.confirmedPixels, ...state.pendingPixels]),
     }))
+  },
+
+  // ── Likes ─────────────────────────────────────────────────────────────────
+
+  likePixel: async (pixelId) => {
+    const { error } = await supabase.rpc('increment_pixel_likes', { p_id: pixelId })
+    if (error) throw new Error(error.message)
+  },
+
+  // ── Comments ──────────────────────────────────────────────────────────────
+
+  loadComments: async (pixelId) => {
+    const { data, error } = await supabase
+      .from('comments')
+      .select('id, content, created_at')
+      .eq('pixel_id', pixelId)
+      .order('created_at', { ascending: true })
+    if (error) { console.error('loadComments:', error); return [] }
+    return data
+  },
+
+  addComment: async (pixelId, content) => {
+    const { error } = await supabase
+      .from('comments')
+      .insert({ pixel_id: pixelId, content })
+    if (error) throw new Error(error.message)
   },
 
   // ── Local helpers ─────────────────────────────────────────────────────────

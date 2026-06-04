@@ -16,6 +16,9 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
   const [isLight, setIsLight]       = useState(
     () => document.documentElement.getAttribute('data-theme') === 'light'
   )
+  const [pseudo, setPseudo]             = useState('')
+  const [description, setDescription]   = useState('')
+  const [selectedColor, setSelectedColor] = useState('#E8C84A')
 
   const mediaRecorderRef = useRef(null)
   const streamRef        = useRef(null)
@@ -51,6 +54,9 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
     setIsPlaying(false)
     setMicError(null)
     setUploadError(null)
+    setPseudo('')
+    setDescription('')
+    setSelectedColor('#E8C84A')
     // confirmedPixels intentionally NOT cleared here — they must stay visible
     // on the map after purchase even when the sidebar closes
   }, [country?.iso])
@@ -230,7 +236,12 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
 
       // ── 2. Insertion pixels ──────────────────────────────────────────────
       console.log('Insertion pixels...')
-      await useMapStore.getState().commitPendingPixels(publicUrl)
+      await useMapStore.getState().commitPendingPixels({
+        audioUrl: publicUrl,
+        pseudo: pseudo.trim() || null,
+        description: description.trim() || null,
+        color: selectedColor !== '#E8C84A' ? selectedColor : null,
+      })
       console.log('Pixels insérés avec succès')
 
       onClose()
@@ -290,6 +301,63 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
       </div>
 
       <div style={{ height: 1, background: dividerClr, margin: '0 28px' }} />
+
+      {/* ── Meta: pseudo, description, color ── */}
+      <div style={{ padding: '14px 28px 0' }}>
+        <input
+          type="text"
+          value={pseudo}
+          onChange={e => setPseudo(e.target.value)}
+          placeholder="Prénom / pseudo (optionnel)"
+          maxLength={50}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            background: 'rgba(255,255,255,0.04)',
+            border: `1px solid ${dividerClr}`,
+            color: 'var(--text)',
+            fontFamily: MONO, fontSize: 11, letterSpacing: 0.5,
+            padding: '9px 12px', borderRadius: 2, outline: 'none',
+            marginBottom: 8,
+          }}
+        />
+        <textarea
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          placeholder="Message / lien (optionnel)"
+          rows={2}
+          maxLength={280}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            background: 'rgba(255,255,255,0.04)',
+            border: `1px solid ${dividerClr}`,
+            color: 'var(--text)',
+            fontFamily: MONO, fontSize: 11, letterSpacing: 0.5,
+            padding: '9px 12px', borderRadius: 2, outline: 'none',
+            resize: 'none', lineHeight: 1.5, marginBottom: 8,
+          }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="color"
+            value={selectedColor}
+            onChange={e => setSelectedColor(e.target.value)}
+            title="Couleur du pixel"
+            style={{
+              width: 32, height: 26, border: 'none', cursor: 'pointer',
+              padding: 0, background: 'none', borderRadius: 2,
+            }}
+          />
+          <span style={{ fontFamily: MONO, fontSize: 9, color: mutedColor, letterSpacing: 1.5 }}>
+            COULEUR DU PIXEL
+          </span>
+          <div style={{
+            width: 12, height: 12, borderRadius: '50%', marginLeft: 'auto',
+            background: selectedColor, border: '1px solid rgba(255,255,255,0.25)', flexShrink: 0,
+          }} />
+        </div>
+      </div>
+
+      <div style={{ height: 1, background: dividerClr, margin: '14px 28px 0' }} />
 
       {/* ── Recording section ── */}
       <div style={{ padding: '18px 28px 0' }}>

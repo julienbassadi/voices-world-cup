@@ -97,7 +97,7 @@ function buildGrid(projection, feature) {
   return cells
 }
 
-export default function WorldMap({ onCountryClick, onCountryHover }) {
+export default function WorldMap({ onCountryClick, onCountryHover, onPixelDoubleClick }) {
   const svgRef          = useRef(null)
   const containerRef    = useRef(null)
   const groupsRef       = useRef({})
@@ -106,13 +106,15 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
   const projectionRef   = useRef(null)
   const occupiedMaps    = useRef({})
   const pixelsMaps      = useRef({})
-  const callbacksRef    = useRef({ onCountryClick, onCountryHover })
+  const callbacksRef    = useRef({ onCountryClick, onCountryHover, onPixelDoubleClick })
+  const clickTimerRef   = useRef(null)
+  const lastClickRef    = useRef(null)
 
   const [tooltip, setTooltip] = useState(null)
 
   useEffect(() => {
-    callbacksRef.current = { onCountryClick, onCountryHover }
-  }, [onCountryClick, onCountryHover])
+    callbacksRef.current = { onCountryClick, onCountryHover, onPixelDoubleClick }
+  }, [onCountryClick, onCountryHover, onPixelDoubleClick])
 
   const pixelsByCountry  = useMapStore(s => s.pixelsByCountry)
   const playingPixels    = useMapStore(s => s.playingPixels)
@@ -233,8 +235,9 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
             const confirmed = store.confirmedPixels.has(`${iso}:${d.id}`)
             const pending   = store.pendingPixels.has(`${iso}:${d.id}`)
             if (occupied || confirmed) {
-              d3.select(event.target).attr('fill', '#FFE085').attr('fill-opacity', 1)
-              setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: 'ÉCOUTER' })
+              const px = pixelsMaps.current[iso]?.get(d.id)
+              d3.select(event.target).attr('fill', px?.color ?? '#FFE085').attr('fill-opacity', 1)
+              setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: 'ÉCOUTER — DOUBLE-CLIC POUR DÉTAILS' })
             } else if (pending) {
               d3.select(event.target).attr('fill', '#FFE085').attr('fill-opacity', 0.8)
               setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: 'SÉLECTIONNÉ — CLIQUER POUR RETIRER' })
@@ -253,9 +256,10 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
             const occupied  = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
             const confirmed = store.confirmedPixels.has(`${iso}:${d.id}`)
             const pending   = store.pendingPixels.has(`${iso}:${d.id}`)
+            const px = pixelsMaps.current[iso]?.get(d.id)
             d3.select(event.target)
-              .attr('fill',         occupied || confirmed ? '#E8C84A' : pending ? '#E8C84A' : 'transparent')
-              .attr('fill-opacity', occupied || confirmed ? 0.9       : pending ? 0.5       : 0)
+              .attr('fill',         occupied || confirmed ? (px?.color ?? '#E8C84A') : pending ? '#E8C84A' : 'transparent')
+              .attr('fill-opacity', occupied || confirmed ? 0.9 : pending ? 0.5 : 0)
           })
           .on('click', function(event) {
             if (event.target.tagName !== 'rect') return
@@ -265,8 +269,24 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
             const occupied  = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
             const confirmed = store.confirmedPixels.has(`${iso}:${d.id}`)
             if (occupied || confirmed) {
-              const dbId = pixelsMaps.current[iso]?.get(d.id)?.id
-              store.setClickedPixel(iso, dbId ?? d.id)
+              const key = `${iso}:${d.id}`
+              if (clickTimerRef.current && lastClickRef.current === key) {
+                // Double-click → open modal
+                clearTimeout(clickTimerRef.current)
+                clickTimerRef.current = null
+                lastClickRef.current  = null
+                const pixel = pixelsMaps.current[iso]?.get(d.id)
+                if (pixel) callbacksRef.current.onPixelDoubleClick?.({ iso, pixel })
+              } else {
+                // First click — wait 240ms to confirm it's not a double-click
+                lastClickRef.current = key
+                clickTimerRef.current = setTimeout(() => {
+                  clickTimerRef.current = null
+                  lastClickRef.current  = null
+                  const dbId = pixelsMaps.current[iso]?.get(d.id)?.id
+                  useMapStore.getState().setClickedPixel(iso, dbId ?? d.id)
+                }, 240)
+              }
             } else {
               store.togglePendingPixel(iso, d.id)
               callbacksRef.current.onCountryClick?.(country)
@@ -336,32 +356,32 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
       groups.forEach(group => {
         group.selectAll('rect')
           .attr('fill', d => {
-            if (occupiedCellIds.has(d.id))                      return '#E8C84A'
-            if (confirmedPixels.has(`${iso}:${d.id}`))         return '#E8C84A'
-            if (pendingPixels.has(`${iso}:${d.id}`))           return '#E8C84A'
+            if (occupiedCellIds.has(d.id)) return cellIdToPixel.get(d.id)?.color ?? '#E8C84A'
+            if (confirmedPixels.has(`${iso}:${d.id}`))  return '#E8C84A'
+            if (pendingPixels.has(`${iso}:${d.id}`))    return '#E8C84A'
             return 'transparent'
           })
           .attr('fill-opacity', d => {
-            if (occupiedCellIds.has(d.id))                      return 0.9
-            if (confirmedPixels.has(`${iso}:${d.id}`))         return 0.9
-            if (pendingPixels.has(`${iso}:${d.id}`))           return 0.5
+            if (occupiedCellIds.has(d.id))               return 0.9
+            if (confirmedPixels.has(`${iso}:${d.id}`))  return 0.9
+            if (pendingPixels.has(`${iso}:${d.id}`))    return 0.5
             return 0
           })
           .attr('stroke', d => {
-            const dbId = cellIdToPixel.get(d.id)?.id
-            if (dbId && playingPixels.has(`${iso}:${dbId}`))    return '#ffffff'
-            if (occupiedCellIds.has(d.id))                      return '#E8C84A'
-            if (confirmedPixels.has(`${iso}:${d.id}`))         return '#E8C84A'
-            if (pendingPixels.has(`${iso}:${d.id}`))           return '#E8C84A'
+            const px = cellIdToPixel.get(d.id)
+            if (px && playingPixels.has(`${iso}:${px.id}`)) return '#ffffff'
+            if (occupiedCellIds.has(d.id)) return px?.color ?? '#E8C84A'
+            if (confirmedPixels.has(`${iso}:${d.id}`))  return '#E8C84A'
+            if (pendingPixels.has(`${iso}:${d.id}`))    return '#E8C84A'
             return '#1a2a4a'
           })
           .attr('stroke-width', d => {
-            const dbId = cellIdToPixel.get(d.id)?.id
-            return dbId && playingPixels.has(`${iso}:${dbId}`) ? 1.5 : 0.5
+            const px = cellIdToPixel.get(d.id)
+            return px && playingPixels.has(`${iso}:${px.id}`) ? 1.5 : 0.5
           })
           .classed('pixel-playing', d => {
-            const dbId = cellIdToPixel.get(d.id)?.id
-            return !!(dbId && playingPixels.has(`${iso}:${dbId}`))
+            const px = cellIdToPixel.get(d.id)
+            return !!(px && playingPixels.has(`${iso}:${px.id}`))
           })
       })
     })
