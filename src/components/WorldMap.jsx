@@ -282,37 +282,50 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
 
   // ─── Sync purchased + pending + playing pixels across all 3 tile copies ──
   useEffect(() => {
+    const { cellsByCountry } = useMapStore.getState()
     QUALIFIED.forEach(({ iso }) => {
       const pixels = pixelsByCountry[iso] ?? []
-      const ids = new Set(pixels.map(p => p.id))
-      occupiedMaps.current[iso] = ids
-      pixelsMaps.current[iso] = pixels
+      const cells  = cellsByCountry[iso]  ?? []
+
+      // Build a lat/lng → cellId lookup so DB pixels can be matched to grid cells
+      const cellByLatLng = new Map()
+      for (const cell of cells) cellByLatLng.set(`${cell.lat}:${cell.lng}`, cell.id)
+
+      const occupiedCellIds = new Set()
+      for (const pixel of pixels) {
+        const cellId = cellByLatLng.get(`${pixel.lat}:${pixel.lng}`)
+        if (cellId) occupiedCellIds.add(cellId)
+      }
+      occupiedMaps.current[iso] = occupiedCellIds
+
       const groups = cellsGroupsRef.current[iso] ?? []
       groups.forEach(group => {
         group.selectAll('rect')
           .attr('fill', d => {
-            if (ids.has(d.id))                                  return '#E8C84A'
+            if (occupiedCellIds.has(d.id))                      return '#E8C84A'
             if (confirmedPixels.has(`${iso}:${d.id}`))         return '#E8C84A'
             if (pendingPixels.has(`${iso}:${d.id}`))           return '#E8C84A'
             return 'transparent'
           })
           .attr('fill-opacity', d => {
-            if (ids.has(d.id))                                  return 0.9
+            if (occupiedCellIds.has(d.id))                      return 0.9
             if (confirmedPixels.has(`${iso}:${d.id}`))         return 0.9
             if (pendingPixels.has(`${iso}:${d.id}`))           return 0.5
             return 0
           })
           .attr('stroke', d => {
-            if (ids.has(d.id) && playingPixels.has(`${iso}:${d.id}`)) return '#ffffff'
-            if (ids.has(d.id))                                  return '#E8C84A'
+            if (occupiedCellIds.has(d.id) && playingPixels.has(`${iso}:${d.id}`)) return '#ffffff'
+            if (occupiedCellIds.has(d.id))                      return '#E8C84A'
             if (confirmedPixels.has(`${iso}:${d.id}`))         return '#E8C84A'
             if (pendingPixels.has(`${iso}:${d.id}`))           return '#E8C84A'
             return '#1a2a4a'
           })
           .attr('stroke-width', d =>
-            ids.has(d.id) && playingPixels.has(`${iso}:${d.id}`) ? 1.5 : 0.5
+            occupiedCellIds.has(d.id) && playingPixels.has(`${iso}:${d.id}`) ? 1.5 : 0.5
           )
-          .classed('pixel-playing', d => ids.has(d.id) && playingPixels.has(`${iso}:${d.id}`))
+          .classed('pixel-playing', d =>
+            occupiedCellIds.has(d.id) && playingPixels.has(`${iso}:${d.id}`)
+          )
       })
     })
   }, [pixelsByCountry, playingPixels, pendingPixels, confirmedPixels])

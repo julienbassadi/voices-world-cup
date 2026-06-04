@@ -1,26 +1,36 @@
 import { useState, useEffect, useRef } from 'react'
 import useMapStore from '../store/mapStore'
 import useAuthStore from '../store/authStore'
+import { supabase } from '../lib/supabase'
 
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
 
 export default function Sidebar({ country, onClose, onNeedAuth }) {
-  const [recState, setRecState] = useState('idle')
-  const [timeLeft, setTimeLeft] = useState(30)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isLight, setIsLight] = useState(
+  const [recState, setRecState]     = useState('idle')
+  const [timeLeft, setTimeLeft]     = useState(30)
+  const [isPlaying, setIsPlaying]   = useState(false)
+  const [micError, setMicError]     = useState(null)
+  const [uploadError, setUploadError] = useState(null)
+  const [isCommitting, setIsCommitting] = useState(false)
+  const [isLight, setIsLight]       = useState(
     () => document.documentElement.getAttribute('data-theme') === 'light'
   )
-  const playTimerRef = useRef(null)
-  const timerRef     = useRef(null)
+
+  const mediaRecorderRef = useRef(null)
+  const streamRef        = useRef(null)
+  const audioChunksRef   = useRef([])
+  const audioBlobRef     = useRef(null)
+  const audioUrlRef      = useRef(null)
+  const audioPlayerRef   = useRef(null)
+  const timerRef         = useRef(null)
 
   const pixelsByCountry = useMapStore(s => s.pixelsByCountry)
   const pendingPixels   = useMapStore(s => s.pendingPixels)
   const currentPixels   = (pixelsByCountry[country?.iso] ?? []).length
   const pendingCount    = pendingPixels.size
-
-  const isLoggedIn = useAuthStore(s => s.isLoggedIn)
+  const isLoggedIn      = useAuthStore(s => s.isLoggedIn)
+  const user            = useAuthStore(s => s.user)
 
   // Mirror theme changes from HUD
   useEffect(() => {
@@ -31,21 +41,27 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
     return () => obs.disconnect()
   }, [])
 
-  // Reset recording state when a different country opens the sidebar
+  // Reset everything when country changes
   useEffect(() => {
-    clearTimeout(playTimerRef.current)
+    stopRecording()
+    revokeAudioUrl()
     clearInterval(timerRef.current)
     setRecState('idle')
     setTimeLeft(30)
     setIsPlaying(false)
+    setMicError(null)
+    setUploadError(null)
+    useMapStore.getState().clearConfirmedPixels()
   }, [country?.iso])
 
+  // Cleanup on unmount
   useEffect(() => () => {
-    clearTimeout(playTimerRef.current)
+    stopRecording()
+    revokeAudioUrl()
     clearInterval(timerRef.current)
   }, [])
 
-  // Countdown tick
+  // Countdown tick while recording
   useEffect(() => {
     if (recState !== 'recording') return
     const id = setInterval(() => setTimeLeft(t => Math.max(0, t - 1)), 1000)
@@ -53,10 +69,39 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
     return () => clearInterval(id)
   }, [recState])
 
-  // Auto-stop when countdown reaches 0
+  // Auto-stop at 0
   useEffect(() => {
-    if (recState === 'recording' && timeLeft === 0) setRecState('review')
+    if (recState === 'recording' && timeLeft === 0) {
+      clearInterval(timerRef.current)
+      mediaRecorderRef.current?.stop()
+    }
   }, [recState, timeLeft])
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function stopRecording() {
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop()
+    }
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    streamRef.current = null
+    mediaRecorderRef.current = null
+  }
+
+  function revokeAudioUrl() {
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current)
+      audioUrlRef.current = null
+    }
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause()
+      audioPlayerRef.current = null
+    }
+    audioBlobRef.current = null
+    audioChunksRef.current = []
+  }
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleStartRecording = () => {
     if (recState !== 'idle' || pendingCount === 0) return
@@ -64,40 +109,136 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
       onNeedAuth?.(() => setRecState('ready'))
       return
     }
+    setMicError(null)
     setRecState('ready')
   }
 
-  const handleBeginRecording = () => {
-    setTimeLeft(30)
-    setRecState('recording')
+  const handleBeginRecording = async () => {
+    setMicError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      audioChunksRef.current = []
+
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      const recorder = new MediaRecorder(stream, { mimeType })
+      mediaRecorderRef.current = recorder
+
+      recorder.ondataavailable = e => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: mimeType })
+        revokeAudioUrl()
+        audioBlobRef.current = blob
+        audioUrlRef.current = URL.createObjectURL(blob)
+        stream.getTracks().forEach(t => t.stop())
+        setRecState('review')
+      }
+
+      recorder.start()
+      setTimeLeft(30)
+      setRecState('recording')
+    } catch (err) {
+      console.error('Micro access denied:', err)
+      setMicError('Accès au microphone refusé.')
+      setRecState('ready')
+    }
   }
 
   const handleStop = () => {
     clearInterval(timerRef.current)
-    setRecState('review')
+    mediaRecorderRef.current?.stop()
+    // onstop sets recState to 'review'
   }
 
   const handleReplay = () => {
-    if (isPlaying) return
+    if (isPlaying || !audioUrlRef.current) return
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause()
+      audioPlayerRef.current = null
+    }
+    const audio = new Audio(audioUrlRef.current)
+    audioPlayerRef.current = audio
+    audio.onended = () => { setIsPlaying(false); audioPlayerRef.current = null }
+    audio.play()
     setIsPlaying(true)
-    playTimerRef.current = setTimeout(() => setIsPlaying(false), 3000)
   }
 
   const handleRedo = () => {
-    clearTimeout(playTimerRef.current)
     clearInterval(timerRef.current)
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause()
+      audioPlayerRef.current = null
+    }
+    revokeAudioUrl()
     setIsPlaying(false)
     setTimeLeft(30)
     setRecState('ready')
   }
 
-  const handleValidate = () => setRecState('validated')
-  const handleBack     = () => setRecState('review')
+  const handleValidate = () => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause()
+      audioPlayerRef.current = null
+    }
+    setIsPlaying(false)
+    setRecState('validated')
+  }
 
-  const handleCommit = () => {
-    if (!country || recState !== 'validated' || pendingCount === 0) return
-    useMapStore.getState().commitPendingPixels('🎙 Message vocal')
-    onClose()
+  const handleBack = () => setRecState('review')
+
+  const handleCommit = async () => {
+    console.log('audioBlob:', audioBlobRef.current)
+    console.log('recState:', recState)
+    if (!country || recState !== 'validated' || pendingCount === 0) {
+      setUploadError('Conditions non remplies. Veuillez sélectionner des pixels et valider un enregistrement.')
+      return
+    }
+    if (!audioBlobRef.current) {
+      setUploadError('Aucun enregistrement audio trouvé. Recommencez l\'enregistrement.')
+      return
+    }
+    if (!user?.id) {
+      setUploadError('Vous devez être connecté pour valider.')
+      return
+    }
+
+    setIsCommitting(true)
+    setUploadError(null)
+
+    try {
+      // ── 1. Upload audio ──────────────────────────────────────────────────
+      const ext  = audioBlobRef.current.type.includes('mp4') ? 'mp4' : 'webm'
+      const path = `${user.id}/${country.iso}/${Date.now()}.${ext}`
+      console.log('Upload audio...', { path, size: audioBlobRef.current.size, type: audioBlobRef.current.type })
+
+      const { data: uploadData, error: uploadErr } = await supabase.storage
+        .from('audio')
+        .upload(path, audioBlobRef.current, { contentType: audioBlobRef.current.type, upsert: false })
+
+      if (uploadErr) {
+        console.error('Erreur upload Supabase Storage:', uploadErr)
+        throw new Error(`Upload échoué : ${uploadErr.message}`)
+      }
+
+      console.log('Upload réussi :', uploadData)
+      const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(path)
+      console.log('Upload réussi, URL :', publicUrl)
+
+      // ── 2. Insertion pixels ──────────────────────────────────────────────
+      console.log('Insertion pixels...')
+      await useMapStore.getState().commitPendingPixels(publicUrl)
+      console.log('Pixels insérés avec succès')
+
+      onClose()
+    } catch (err) {
+      console.error('[Sidebar.handleCommit] Erreur complète :', err)
+      setUploadError(err.message ?? 'Erreur inconnue.')
+    } finally {
+      setIsCommitting(false)
+    }
   }
 
   if (!country) return null
@@ -128,7 +269,7 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
       overflowY: 'auto',
     }}>
 
-      {/* Close — top left, away from HUD buttons */}
+      {/* Close */}
       <button onClick={onClose} style={{
         position: 'absolute', top: 16, left: 18,
         background: 'none', border: 'none',
@@ -152,14 +293,12 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
       {/* ── Recording section ── */}
       <div style={{ padding: '18px 28px 0' }}>
 
-        {/* IDLE — selection status */}
+        {/* IDLE */}
         {recState === 'idle' && (
           <div style={{
             fontFamily: MONO, fontSize: 11, letterSpacing: 1,
             color: pendingCount > 0 ? accent : mutedColor,
-            textAlign: 'center',
-            padding: '12px 0',
-            lineHeight: 1.6,
+            textAlign: 'center', padding: '12px 0', lineHeight: 1.6,
           }}>
             {pendingCount > 0
               ? <>
@@ -174,7 +313,7 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
           </div>
         )}
 
-        {/* READY — attend le clic de l'utilisateur pour démarrer */}
+        {/* READY */}
         {recState === 'ready' && (
           <div style={{ textAlign: 'center', padding: '14px 0' }}>
             <button onClick={handleBeginRecording} style={{
@@ -187,9 +326,16 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
             }}>
               🎙 ENREGISTRER
             </button>
-            <div style={{ fontFamily: MONO, color: mutedColor, fontSize: 10, marginTop: 10, letterSpacing: 1 }}>
-              Appuyez pour démarrer le chrono de 30s
-            </div>
+            {micError && (
+              <div style={{ fontFamily: MONO, color: '#EF4444', fontSize: 10, marginTop: 10, letterSpacing: 0.5 }}>
+                {micError}
+              </div>
+            )}
+            {!micError && (
+              <div style={{ fontFamily: MONO, color: mutedColor, fontSize: 10, marginTop: 10, letterSpacing: 1 }}>
+                Appuyez pour démarrer le chrono de 30s
+              </div>
+            )}
           </div>
         )}
 
@@ -299,10 +445,15 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
         )}
       </div>
 
-      {/* ── Bottom — pinned confirm button ── */}
+      {/* ── Bottom — pinned buttons ── */}
       <div style={{ marginTop: 'auto', padding: '20px 28px 32px' }}>
 
-        {/* Idle + no pixels: hint */}
+        {uploadError && (
+          <div style={{ fontFamily: MONO, color: '#EF4444', fontSize: 10, letterSpacing: 0.5, marginBottom: 10 }}>
+            {uploadError}
+          </div>
+        )}
+
         {recState === 'idle' && pendingCount === 0 && (
           <div style={{
             fontFamily: MONO, color: mutedColor, fontSize: 10,
@@ -312,7 +463,6 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
           </div>
         )}
 
-        {/* Idle + pixels selected → start recording */}
         {confirmActive && (
           <button
             onClick={handleStartRecording}
@@ -325,33 +475,34 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
               color: isLight ? '#ffffff' : '#05080F',
               fontFamily: BEBAS, fontSize: 17, letterSpacing: 3,
               cursor: 'pointer', borderRadius: 2,
-              transition: 'all 0.25s',
-              boxShadow: shadow,
-              whiteSpace: 'nowrap',
+              transition: 'all 0.25s', boxShadow: shadow, whiteSpace: 'nowrap',
             }}
           >
             CONFIRMER {pendingCount} PIXEL{pendingCount > 1 ? 'S' : ''} — {pendingCount}€
           </button>
         )}
 
-        {/* Validated + pixels → final commit */}
         {commitActive && (
           <button
             onClick={handleCommit}
+            disabled={isCommitting}
             style={{
               width: '100%', padding: '15px 20px',
-              background: isLight
-                ? 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)'
-                : 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)',
+              background: isCommitting
+                ? (isLight ? 'rgba(26,48,128,0.15)' : 'rgba(255,255,255,0.06)')
+                : (isLight
+                    ? 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)'
+                    : 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)'),
               border: 'none',
-              color: isLight ? '#ffffff' : '#05080F',
+              color: isCommitting
+                ? mutedColor
+                : (isLight ? '#ffffff' : '#05080F'),
               fontFamily: BEBAS, fontSize: 17, letterSpacing: 3,
-              cursor: 'pointer', borderRadius: 2,
-              transition: 'all 0.25s',
-              boxShadow: shadow,
+              cursor: isCommitting ? 'not-allowed' : 'pointer',
+              borderRadius: 2, transition: 'all 0.25s', boxShadow: shadow,
             }}
           >
-            CONFIRMER L'ACHAT
+            {isCommitting ? 'ENVOI EN COURS…' : 'CONFIRMER L\'ACHAT'}
           </button>
         )}
       </div>

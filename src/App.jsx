@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import WorldMap from './components/WorldMap'
 import Sidebar from './components/Sidebar'
 import HUD from './components/HUD'
@@ -11,6 +11,11 @@ export default function App() {
   const [lastHoveredCountry, setLastHoveredCountry] = useState(null)
   const [showAuth, setShowAuth]                   = useState(false)
   const authCallbackRef                           = useRef(null)
+
+  useEffect(() => {
+    useMapStore.getState().loadPixels()
+    return useMapStore.getState().subscribeToPixels()
+  }, [])
 
   const handleCountryClick = useCallback(country => setSelectedCountry(country), [])
   const handleCountryHover = useCallback(country => setLastHoveredCountry(country), [])

@@ -65,43 +65,53 @@ export default function Auth({ onClose, onSuccess }) {
   const [lastName, setLastName]   = useState('')
   const [isAnonymous, setIsAnonymous] = useState(false)
   const [linkSent, setLinkSent]   = useState(false)
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState(null)
   const loginTimerRef             = useRef(null)
 
-  const login   = useAuthStore(s => s.login)
-  const isLight = useTheme()
+  const login         = useAuthStore(s => s.login)
+  const createAccount = useAuthStore(s => s.createAccount)
+  const isLight       = useTheme()
 
   // Clean up auto-login timer if modal closes before it fires
   useEffect(() => () => clearTimeout(loginTimerRef.current), [])
 
-  const switchTab = (t) => { setTab(t); setLinkSent(false) }
+  const switchTab = (t) => { setTab(t); setLinkSent(false); setError(null) }
 
   // ── Connexion — magic link simulation ──────────────────────────────────────
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email.trim()) return
+    setError(null)
     setLinkSent(true)
-    loginTimerRef.current = setTimeout(() => {
-      login({
-        id: crypto.randomUUID(),
-        firstName: '',
-        lastName: '',
-        email: email.trim(),
-        isAnonymous: false,
-      })
+    try {
+      await login(email.trim())
+      await new Promise(r => (loginTimerRef.current = setTimeout(r, 2200)))
       onSuccess()
-    }, 2200)
+    } catch {
+      setLinkSent(false)
+      setError('Email non reconnu. Créez un compte d\'abord.')
+    }
   }
 
   // ── Inscription ────────────────────────────────────────────────────────────
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!firstName.trim() || !lastName.trim() || !email.trim()) return
-    login({
-      id: crypto.randomUUID(),
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: email.trim(),
-      isAnonymous,
-    })
-    onSuccess()
+    setError(null)
+    setLoading(true)
+    try {
+      await createAccount(email.trim(), firstName.trim(), lastName.trim(), isAnonymous)
+      onSuccess()
+    } catch (err) {
+      const msg = err?.message ?? ''
+      const hint = err?.hint ? ` (${err.hint})` : ''
+      if (msg.includes('duplicate') || msg.includes('unique') || err?.code === '23505') {
+        setError('Cet email est déjà utilisé.')
+      } else {
+        setError(`Erreur : ${msg}${hint}`)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   const accent      = isLight ? '#1a3080' : '#E8C84A'
@@ -203,6 +213,11 @@ export default function Auth({ onClose, onSuccess }) {
                 style={mkInput(isLight)}
                 autoFocus
               />
+              {error && (
+                <div style={{ fontFamily: MONO, fontSize: 10, color: '#EF4444', marginBottom: 10, letterSpacing: 0.5 }}>
+                  {error}
+                </div>
+              )}
               <button
                 onClick={handleLogin}
                 disabled={!email.trim()}
@@ -276,12 +291,17 @@ export default function Auth({ onClose, onSuccess }) {
               </span>
             </div>
 
+            {error && (
+              <div style={{ fontFamily: MONO, fontSize: 10, color: '#EF4444', marginBottom: 10, letterSpacing: 0.5 }}>
+                {error}
+              </div>
+            )}
             <button
               onClick={handleRegister}
-              disabled={!firstName.trim() || !lastName.trim() || !email.trim()}
-              style={mkPrimaryBtn(isLight, !firstName.trim() || !lastName.trim() || !email.trim())}
+              disabled={loading || !firstName.trim() || !lastName.trim() || !email.trim()}
+              style={mkPrimaryBtn(isLight, loading || !firstName.trim() || !lastName.trim() || !email.trim())}
             >
-              CRÉER MON COMPTE
+              {loading ? 'CRÉATION...' : 'CRÉER MON COMPTE'}
             </button>
           </>
         )}
