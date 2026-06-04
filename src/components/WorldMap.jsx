@@ -240,7 +240,8 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
             const occupied  = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
             const confirmed = store.confirmedPixels.has(`${iso}:${d.id}`)
             if (occupied || confirmed) {
-              store.setClickedPixel(iso, d.id)
+              const dbId = pixelsMaps.current[iso]?.get(d.id)?.id
+              store.setClickedPixel(iso, dbId ?? d.id)
             } else {
               store.togglePendingPixel(iso, d.id)
               callbacksRef.current.onCountryClick?.(country)
@@ -292,11 +293,16 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
       for (const cell of cells) cellByLatLng.set(`${cell.lat}:${cell.lng}`, cell.id)
 
       const occupiedCellIds = new Set()
+      const cellIdToPixel   = new Map()
       for (const pixel of pixels) {
         const cellId = cellByLatLng.get(`${pixel.lat}:${pixel.lng}`)
-        if (cellId) occupiedCellIds.add(cellId)
+        if (cellId) {
+          occupiedCellIds.add(cellId)
+          cellIdToPixel.set(cellId, pixel)
+        }
       }
       occupiedMaps.current[iso] = occupiedCellIds
+      pixelsMaps.current[iso]   = cellIdToPixel
 
       const groups = cellsGroupsRef.current[iso] ?? []
       groups.forEach(group => {
@@ -314,18 +320,21 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
             return 0
           })
           .attr('stroke', d => {
-            if (occupiedCellIds.has(d.id) && playingPixels.has(`${iso}:${d.id}`)) return '#ffffff'
+            const dbId = cellIdToPixel.get(d.id)?.id
+            if (dbId && playingPixels.has(`${iso}:${dbId}`))    return '#ffffff'
             if (occupiedCellIds.has(d.id))                      return '#E8C84A'
             if (confirmedPixels.has(`${iso}:${d.id}`))         return '#E8C84A'
             if (pendingPixels.has(`${iso}:${d.id}`))           return '#E8C84A'
             return '#1a2a4a'
           })
-          .attr('stroke-width', d =>
-            occupiedCellIds.has(d.id) && playingPixels.has(`${iso}:${d.id}`) ? 1.5 : 0.5
-          )
-          .classed('pixel-playing', d =>
-            occupiedCellIds.has(d.id) && playingPixels.has(`${iso}:${d.id}`)
-          )
+          .attr('stroke-width', d => {
+            const dbId = cellIdToPixel.get(d.id)?.id
+            return dbId && playingPixels.has(`${iso}:${dbId}`) ? 1.5 : 0.5
+          })
+          .classed('pixel-playing', d => {
+            const dbId = cellIdToPixel.get(d.id)?.id
+            return !!(dbId && playingPixels.has(`${iso}:${dbId}`))
+          })
       })
     })
   }, [pixelsByCountry, playingPixels, pendingPixels, confirmedPixels])
