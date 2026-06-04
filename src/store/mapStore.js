@@ -39,15 +39,21 @@ const useMapStore = create((set, get) => ({
 
   // ── Supabase ──────────────────────────────────────────────────────────────
 
+  totalVoices: 0,
+
   loadPixels: async () => {
-    const { data, error } = await supabase.from('pixels').select()
-    if (error) return console.error('loadPixels:', error)
+    const [pixelsRes, countRes] = await Promise.all([
+      supabase.from('pixels').select(),
+      supabase.from('pixels').select('*', { count: 'exact', head: true }),
+    ])
+    if (pixelsRes.error) return console.error('loadPixels:', pixelsRes.error)
+    if (countRes.error) return console.error('loadTotalVoices:', countRes.error)
     const pbc = {}
-    for (const p of data) {
+    for (const p of pixelsRes.data) {
       if (!pbc[p.country_iso]) pbc[p.country_iso] = []
       pbc[p.country_iso].push({ id: p.id, lat: p.x, lng: p.y, userId: p.user_id, audioUrl: p.audio_url })
     }
-    set({ pixelsByCountry: pbc })
+    set({ pixelsByCountry: pbc, totalVoices: countRes.count ?? 0 })
   },
 
   subscribeToPixels: () => {
@@ -56,9 +62,11 @@ const useMapStore = create((set, get) => ({
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pixels' }, ({ new: p }) => {
         set(state => {
           const existing = state.pixelsByCountry[p.country_iso] ?? []
+          // Pixel already added locally by addPixels — skip map update but don't double-count
           if (existing.some(px => px.id === p.id)) return state
           const pixel = { id: p.id, lat: p.x, lng: p.y, userId: p.user_id, audioUrl: p.audio_url }
           return {
+            totalVoices: state.totalVoices + 1,
             pixelsByCountry: {
               ...state.pixelsByCountry,
               [p.country_iso]: [...existing, pixel],
@@ -84,7 +92,9 @@ const useMapStore = create((set, get) => ({
       throw new Error(`Insertion pixels échouée : ${error.message}`)
     }
     const newPixels = data.map(p => ({ id: p.id, lat: p.x, lng: p.y, userId: p.user_id, audioUrl: p.audio_url }))
+    // Increment totalVoices here; subscription will deduplicate and not increment again
     set(state => ({
+      totalVoices: state.totalVoices + newPixels.length,
       pixelsByCountry: {
         ...state.pixelsByCountry,
         [countryIso]: [...(state.pixelsByCountry[countryIso] ?? []), ...newPixels],

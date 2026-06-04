@@ -36,7 +36,7 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar }) {
   }, [theme])
 
   const pixelsByCountry = useMapStore(s => s.pixelsByCountry)
-  const totalPixels = Object.values(pixelsByCountry).reduce((s, a) => s + (a?.length ?? 0), 0)
+  const totalVoices     = useMapStore(s => s.totalVoices)
 
   // All countries with at least 1 pixel, sorted by count — updates on every purchase
   const ranking = useMemo(() => {
@@ -163,7 +163,7 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar }) {
           fontFamily: BEBAS, fontSize: 20,
           color: accent, letterSpacing: 2, lineHeight: 1,
         }}>
-          {fmtVoix(totalPixels)} VOIX
+          {fmtVoix(totalVoices)} VOIX
         </div>
         <button
           onClick={() => setMuted(!muted)}
