@@ -5,7 +5,7 @@ import worldTopo from 'world-atlas/countries-110m.json'
 import franceData from '../data/france.json'
 import useMapStore from '../store/mapStore'
 
-const CELL = 4
+const CELL = 3
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 
 const WORLD_FEATURES = topojson.feature(worldTopo, worldTopo.objects.countries).features
