@@ -90,9 +90,10 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
     callbacksRef.current = { onCountryClick, onCountryHover }
   }, [onCountryClick, onCountryHover])
 
-  const pixelsByCountry = useMapStore(s => s.pixelsByCountry)
-  const playingPixels   = useMapStore(s => s.playingPixels)
-  const pendingPixels   = useMapStore(s => s.pendingPixels)
+  const pixelsByCountry  = useMapStore(s => s.pixelsByCountry)
+  const playingPixels    = useMapStore(s => s.playingPixels)
+  const pendingPixels    = useMapStore(s => s.pendingPixels)
+  const confirmedPixels  = useMapStore(s => s.confirmedPixels)
   const frPixelCount = (pixelsByCountry.fr ?? []).length
   const frScale = 1 + frPixelCount * 0.0008
 
@@ -202,9 +203,11 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
             if (!d) return
             callbacksRef.current.onCountryHover?.(country)
             svg.style('cursor', 'pointer')
-            const occupied = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
-            const pending  = useMapStore.getState().pendingPixels.has(`${iso}:${d.id}`)
-            if (occupied) {
+            const store     = useMapStore.getState()
+            const occupied  = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
+            const confirmed = store.confirmedPixels.has(`${iso}:${d.id}`)
+            const pending   = store.pendingPixels.has(`${iso}:${d.id}`)
+            if (occupied || confirmed) {
               d3.select(event.target).attr('fill', '#FFE085').attr('fill-opacity', 1)
               setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: 'ÉCOUTER' })
             } else if (pending) {
@@ -221,21 +224,25 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
             if (!d) return
             setTooltip(null)
             svg.style('cursor', 'grab')
-            const occupied = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
-            const pending  = useMapStore.getState().pendingPixels.has(`${iso}:${d.id}`)
+            const store     = useMapStore.getState()
+            const occupied  = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
+            const confirmed = store.confirmedPixels.has(`${iso}:${d.id}`)
+            const pending   = store.pendingPixels.has(`${iso}:${d.id}`)
             d3.select(event.target)
-              .attr('fill',         occupied ? '#E8C84A' : pending ? '#E8C84A' : 'transparent')
-              .attr('fill-opacity', occupied ? 0.9      : pending ? 0.5       : 0)
+              .attr('fill',         occupied || confirmed ? '#E8C84A' : pending ? '#E8C84A' : 'transparent')
+              .attr('fill-opacity', occupied || confirmed ? 0.9       : pending ? 0.5       : 0)
           })
           .on('click', function(event) {
             if (event.target.tagName !== 'rect') return
             const d = event.target.__data__
             if (!d) return
-            const occupied = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
-            if (occupied) {
-              useMapStore.getState().setClickedPixel(iso, d.id)
+            const store     = useMapStore.getState()
+            const occupied  = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
+            const confirmed = store.confirmedPixels.has(`${iso}:${d.id}`)
+            if (occupied || confirmed) {
+              store.setClickedPixel(iso, d.id)
             } else {
-              useMapStore.getState().togglePendingPixel(iso, d.id)
+              store.togglePendingPixel(iso, d.id)
               callbacksRef.current.onCountryClick?.(country)
             }
           })
@@ -284,19 +291,22 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
       groups.forEach(group => {
         group.selectAll('rect')
           .attr('fill', d => {
-            if (ids.has(d.id))                           return '#E8C84A'
-            if (pendingPixels.has(`${iso}:${d.id}`))    return '#E8C84A'
+            if (ids.has(d.id))                                  return '#E8C84A'
+            if (confirmedPixels.has(`${iso}:${d.id}`))         return '#E8C84A'
+            if (pendingPixels.has(`${iso}:${d.id}`))           return '#E8C84A'
             return 'transparent'
           })
           .attr('fill-opacity', d => {
-            if (ids.has(d.id))                           return 0.9
-            if (pendingPixels.has(`${iso}:${d.id}`))    return 0.5
+            if (ids.has(d.id))                                  return 0.9
+            if (confirmedPixels.has(`${iso}:${d.id}`))         return 0.9
+            if (pendingPixels.has(`${iso}:${d.id}`))           return 0.5
             return 0
           })
           .attr('stroke', d => {
             if (ids.has(d.id) && playingPixels.has(`${iso}:${d.id}`)) return '#ffffff'
-            if (ids.has(d.id))                           return '#E8C84A'
-            if (pendingPixels.has(`${iso}:${d.id}`))    return '#E8C84A'
+            if (ids.has(d.id))                                  return '#E8C84A'
+            if (confirmedPixels.has(`${iso}:${d.id}`))         return '#E8C84A'
+            if (pendingPixels.has(`${iso}:${d.id}`))           return '#E8C84A'
             return '#1a2a4a'
           })
           .attr('stroke-width', d =>
@@ -305,7 +315,7 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
           .classed('pixel-playing', d => ids.has(d.id) && playingPixels.has(`${iso}:${d.id}`))
       })
     })
-  }, [pixelsByCountry, playingPixels, pendingPixels])
+  }, [pixelsByCountry, playingPixels, pendingPixels, confirmedPixels])
 
   // ─── Scale France from its centroid ───────────────────────────────────────
   useEffect(() => {
