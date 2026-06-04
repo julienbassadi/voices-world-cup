@@ -72,7 +72,6 @@ const useMapStore = create((set, get) => ({
 
   addPixels: async (countryIso, pixelsArray, audioUrl = null) => {
     const userId = useAuthStore.getState().user?.id
-    console.log('[mapStore.addPixels]', { countryIso, count: pixelsArray.length, userId, audioUrl })
     const rows = pixelsArray.map(cell => ({
       user_id: userId,
       country_iso: countryIso,
@@ -80,13 +79,10 @@ const useMapStore = create((set, get) => ({
       y: cell.lng,
       audio_url: audioUrl,
     }))
-    console.log('[mapStore.addPixels] rows à insérer :', rows)
     const { data, error } = await supabase.from('pixels').insert(rows).select()
     if (error) {
-      console.error('[mapStore.addPixels] Erreur Supabase :', { message: error.message, code: error.code, details: error.details, hint: error.hint })
       throw new Error(`Insertion pixels échouée : ${error.message}`)
     }
-    console.log('[mapStore.addPixels] Pixels insérés :', data)
     const newPixels = data.map(p => ({ id: p.id, lat: p.x, lng: p.y, userId: p.user_id, audioUrl: p.audio_url }))
     set(state => ({
       pixelsByCountry: {
@@ -98,21 +94,16 @@ const useMapStore = create((set, get) => ({
 
   commitPendingPixels: async (audioUrl = null) => {
     const { pendingPixels, cellsByCountry } = get()
-    console.log('[mapStore.commitPendingPixels]', { pendingPixels: [...pendingPixels], cellsKeys: Object.keys(cellsByCountry), audioUrl })
     const byCountry = {}
     for (const key of pendingPixels) {
       const sep  = key.indexOf(':')
       const iso  = key.slice(0, sep)
       const cId  = key.slice(sep + 1)
       const cell = (cellsByCountry[iso] ?? []).find(c => c.id === cId)
-      if (!cell) {
-        console.warn(`[mapStore.commitPendingPixels] cellule introuvable pour clé "${key}" — cellsByCountry[${iso}] a ${(cellsByCountry[iso] ?? []).length} entrées`)
-        continue
-      }
+      if (!cell) continue
       if (!byCountry[iso]) byCountry[iso] = []
       byCountry[iso].push(cell)
     }
-    console.log('[mapStore.commitPendingPixels] byCountry :', byCountry)
     if (Object.keys(byCountry).length === 0) {
       throw new Error('Aucune cellule valide trouvée dans pendingPixels. Les cellules sont-elles bien chargées ?')
     }

@@ -51,7 +51,8 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
     setIsPlaying(false)
     setMicError(null)
     setUploadError(null)
-    useMapStore.getState().clearConfirmedPixels()
+    // confirmedPixels intentionally NOT cleared here — they must stay visible
+    // on the map after purchase even when the sidebar closes
   }, [country?.iso])
 
   // Cleanup on unmount
