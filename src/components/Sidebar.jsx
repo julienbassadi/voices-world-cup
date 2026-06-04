@@ -310,11 +310,12 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
           onChange={e => setPseudo(e.target.value)}
           placeholder="Prénom / pseudo (optionnel)"
           maxLength={50}
+          className="sidebar-meta-input"
           style={{
             width: '100%', boxSizing: 'border-box',
-            background: 'rgba(255,255,255,0.04)',
+            background: isLight ? 'rgba(26,48,128,0.06)' : 'rgba(255,255,255,0.06)',
             border: `1px solid ${dividerClr}`,
-            color: 'var(--text)',
+            color: isLight ? '#1a2040' : '#F0F0F0',
             fontFamily: MONO, fontSize: 11, letterSpacing: 0.5,
             padding: '9px 12px', borderRadius: 2, outline: 'none',
             marginBottom: 8,
@@ -326,11 +327,12 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
           placeholder="Message / lien (optionnel)"
           rows={2}
           maxLength={280}
+          className="sidebar-meta-input"
           style={{
             width: '100%', boxSizing: 'border-box',
-            background: 'rgba(255,255,255,0.04)',
+            background: isLight ? 'rgba(26,48,128,0.06)' : 'rgba(255,255,255,0.06)',
             border: `1px solid ${dividerClr}`,
-            color: 'var(--text)',
+            color: isLight ? '#1a2040' : '#F0F0F0',
             fontFamily: MONO, fontSize: 11, letterSpacing: 0.5,
             padding: '9px 12px', borderRadius: 2, outline: 'none',
             resize: 'none', lineHeight: 1.5, marginBottom: 8,
