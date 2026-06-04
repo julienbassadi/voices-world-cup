@@ -80,6 +80,7 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
   const groupsRef       = useRef({})
   const cellsGroupsRef  = useRef({})
   const projCentroidRef = useRef(null)
+  const projectionRef   = useRef(null)
   const occupiedMaps    = useRef({})
   const pixelsMaps      = useRef({})
   const callbacksRef    = useRef({ onCountryClick, onCountryHover })
@@ -112,6 +113,7 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
 
     const projection = d3.geoMercator()
       .fitExtent([[0, 0], [width, height]], WORLD_EXTENT)
+    projectionRef.current = projection
     const pathGen = d3.geoPath().projection(projection)
 
     const tileW = 2 * Math.PI * projection.scale()
@@ -284,21 +286,24 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
   // ─── Sync purchased + pending + playing pixels across all 3 tile copies ──
   useEffect(() => {
     const { cellsByCountry } = useMapStore.getState()
+    const proj = projectionRef.current
     QUALIFIED.forEach(({ iso }) => {
       const pixels = pixelsByCountry[iso] ?? []
       const cells  = cellsByCountry[iso]  ?? []
 
-      // Build a lat/lng → cellId lookup so DB pixels can be matched to grid cells
-      const cellByLatLng = new Map()
-      for (const cell of cells) cellByLatLng.set(`${cell.lat}:${cell.lng}`, cell.id)
-
       const occupiedCellIds = new Set()
       const cellIdToPixel   = new Map()
-      for (const pixel of pixels) {
-        const cellId = cellByLatLng.get(`${pixel.lat}:${pixel.lng}`)
-        if (cellId) {
-          occupiedCellIds.add(cellId)
-          cellIdToPixel.set(cellId, pixel)
+
+      // Project each DB pixel's geographic coords to screen space and find its cell.
+      // Exact float comparison fails across different window sizes; spatial lookup is robust.
+      if (proj) {
+        for (const pixel of pixels) {
+          const [sx, sy] = proj([pixel.lng, pixel.lat])
+          const cell = cells.find(c => sx >= c.x && sx < c.x + CELL && sy >= c.y && sy < c.y + CELL)
+          if (cell) {
+            occupiedCellIds.add(cell.id)
+            cellIdToPixel.set(cell.id, pixel)
+          }
         }
       }
       occupiedMaps.current[iso] = occupiedCellIds
