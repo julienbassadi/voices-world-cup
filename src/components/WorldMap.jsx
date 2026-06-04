@@ -38,7 +38,7 @@ export const QUALIFIED = [
   { numId: 620, iso: 'pt',     name: 'Portugal',            flag: '🇵🇹' },
   { numId: 752, iso: 'se',     name: 'Suède',               flag: '🇸🇪' },
   { numId: 756, iso: 'ch',     name: 'Suisse',              flag: '🇨🇭' },
-  { numId: 203, iso: 'cz',     name: 'Tchéquie',            flag: '🇨🇿' },
+  { numId: 203, iso: 'cz',     name: 'République tchèque',   flag: '🇨🇿' },
   { numId: 792, iso: 'tr',     name: 'Turquie',             flag: '🇹🇷' },
   // Afrique (10)
   { numId: 710, iso: 'za',     name: 'Afrique du Sud',      flag: '🇿🇦' },
@@ -55,12 +55,12 @@ export const QUALIFIED = [
   { numId: 682, iso: 'sa',     name: 'Arabie Saoudite',     flag: '🇸🇦' },
   { numId:  36, iso: 'au',     name: 'Australie',           flag: '🇦🇺' },
   { numId: 368, iso: 'iq',     name: 'Irak',                flag: '🇮🇶' },
-  { numId: 364, iso: 'ir',     name: 'RI Iran',             flag: '🇮🇷' },
+  { numId: 364, iso: 'ir',     name: 'Iran',                flag: '🇮🇷' },
   { numId: 392, iso: 'jp',     name: 'Japon',               flag: '🇯🇵' },
   { numId: 400, iso: 'jo',     name: 'Jordanie',            flag: '🇯🇴' },
   { numId: 860, iso: 'uz',     name: 'Ouzbékistan',         flag: '🇺🇿' },
   { numId: 634, iso: 'qa',     name: 'Qatar',               flag: '🇶🇦' },
-  { numId: 410, iso: 'kr',     name: 'République de Corée', flag: '🇰🇷' },
+  { numId: 410, iso: 'kr',     name: 'Corée du Sud',        flag: '🇰🇷' },
   // Amérique du Sud (6)
   { numId:  32, iso: 'ar',     name: 'Argentine',           flag: '🇦🇷' },
   { numId:  76, iso: 'br',     name: 'Brésil',              flag: '🇧🇷' },
