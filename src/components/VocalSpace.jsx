@@ -68,39 +68,37 @@ export default function VocalSpace({ country, pixel, onClose }) {
 
   async function handleLike() {
     if (isLiking) return
+
+    // Read truth from localStorage directly — avoids stale-closure issues with hasLiked state
+    const wasLiked = !!localStorage.getItem(likeKey)
+    console.log(`[like] clic — localStorage avant: ${wasLiked ? 'liked' : 'not liked'} | state hasLiked: ${hasLiked}`)
+
     setIsLiking(true)
 
-    const wasLiked = hasLiked
-
-    // Optimistic update — apply immediately so UI never feels stuck
     if (wasLiked) {
+      console.log('[like] → unlike : retire du localStorage, décrémente UI')
+      localStorage.removeItem(likeKey)
       setHasLiked(false)
       setLikes(l => Math.max(0, l - 1))
-      localStorage.removeItem(likeKey)
     } else {
+      console.log('[like] → like : ajoute au localStorage, incrémente UI')
+      localStorage.setItem(likeKey, '1')
       setHasLiked(true)
       setLikes(l => l + 1)
-      localStorage.setItem(likeKey, '1')
     }
+    console.log(`[like] localStorage après : ${localStorage.getItem(likeKey) ?? 'absent'}`)
 
     try {
       if (wasLiked) {
         await useMapStore.getState().unlikePixel(pixel.id)
+        console.log('[like] unlike synced Supabase ✓')
       } else {
         await useMapStore.getState().likePixel(pixel.id)
+        console.log('[like] like synced Supabase ✓')
       }
     } catch (e) {
-      console.error('like toggle failed, reverting:', e)
-      // Revert optimistic update on error
-      if (wasLiked) {
-        setHasLiked(true)
-        setLikes(l => l + 1)
-        localStorage.setItem(likeKey, '1')
-      } else {
-        setHasLiked(false)
-        setLikes(l => Math.max(0, l - 1))
-        localStorage.removeItem(likeKey)
-      }
+      // localStorage + UI state are kept — don't revert, Supabase sync best-effort
+      console.warn('[like] Supabase sync failed (état UI conservé) :', e.message)
     } finally {
       setIsLiking(false)
     }
