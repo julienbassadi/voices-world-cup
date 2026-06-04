@@ -69,20 +69,41 @@ export default function VocalSpace({ country, pixel, onClose }) {
   async function handleLike() {
     if (isLiking) return
     setIsLiking(true)
+
+    const wasLiked = hasLiked
+
+    // Optimistic update — apply immediately so UI never feels stuck
+    if (wasLiked) {
+      setHasLiked(false)
+      setLikes(l => Math.max(0, l - 1))
+      localStorage.removeItem(likeKey)
+    } else {
+      setHasLiked(true)
+      setLikes(l => l + 1)
+      localStorage.setItem(likeKey, '1')
+    }
+
     try {
-      if (hasLiked) {
+      if (wasLiked) {
         await useMapStore.getState().unlikePixel(pixel.id)
-        setLikes(l => Math.max(0, l - 1))
-        setHasLiked(false)
-        localStorage.removeItem(likeKey)
       } else {
         await useMapStore.getState().likePixel(pixel.id)
-        setLikes(l => l + 1)
-        setHasLiked(true)
-        localStorage.setItem(likeKey, '1')
       }
-    } catch (e) { console.error(e) }
-    finally { setIsLiking(false) }
+    } catch (e) {
+      console.error('like toggle failed, reverting:', e)
+      // Revert optimistic update on error
+      if (wasLiked) {
+        setHasLiked(true)
+        setLikes(l => l + 1)
+        localStorage.setItem(likeKey, '1')
+      } else {
+        setHasLiked(false)
+        setLikes(l => Math.max(0, l - 1))
+        localStorage.removeItem(likeKey)
+      }
+    } finally {
+      setIsLiking(false)
+    }
   }
 
   function handlePlayAudio() {
