@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import useMapStore from '../store/mapStore'
 import { QUALIFIED } from './WorldMap'
 import MyPixels from './MyPixels'
@@ -39,6 +39,15 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
   }, [theme])
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const rankSwipeRef   = useRef({ startX: 0 })
+  const [rankSwipeDelta, setRankSwipeDelta] = useState(0)
+
+  const onRankSwipeStart = e => { rankSwipeRef.current.startX = e.touches[0].clientX; setRankSwipeDelta(0) }
+  const onRankSwipeMove  = e => { setRankSwipeDelta(e.touches[0].clientX - rankSwipeRef.current.startX) }
+  const onRankSwipeEnd   = () => {
+    if (rankSwipeDelta < -50) { setMobileMenuOpen(false); setRankSwipeDelta(0) }
+    else setRankSwipeDelta(0)
+  }
 
   // One panel at a time: close ranking when sidebar/VocalSpace opens
   useEffect(() => {
@@ -54,9 +63,6 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
       .filter(e => e.country && e.count > 0)
       .sort((a, b) => b.count - a.count)
   }, [pixelsByCountry])
-
-  const muted    = useMapStore(s => s.muted)
-  const setMuted = useMapStore(s => s.setMuted)
 
   const isDark  = theme === 'dark'
   const canOpen = !!lastHoveredCountry
@@ -79,12 +85,16 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   }
 
-  // ── Ranking rows (shared between desktop left panel and mobile drawer) ──────
+  // ── Title block ──────────────────────────────────────────────────────────────
+  const VWCTitle = ({ size = 20 }) => (
+    <div style={{ fontFamily: BEBAS, fontSize: size, color: accent, letterSpacing: 3, lineHeight: 1, flexShrink: 0 }}>
+      VOICES WORLD CUP
+    </div>
+  )
+
+  // ── Ranking rows (without title) ─────────────────────────────────────────────
   const RankingRows = () => (
     <>
-      <div style={{ fontFamily: BEBAS, fontSize: isMobile ? 16 : 20, color: accent, letterSpacing: 3, lineHeight: 1, marginBottom: 14, flexShrink: 0 }}>
-        VOICES WORLD CUP
-      </div>
       {ranking.map(({ iso, count, country }, i) => {
         const color = i < 3 ? MEDAL_COLORS[i] : '#4a5060'
         return (
@@ -151,20 +161,20 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
             ☰
           </button>
 
-          {/* Countdown centered */}
+          {/* Title */}
+          <div style={{ fontFamily: BEBAS, fontSize: 11, letterSpacing: 2, color: accent, lineHeight: 1, flexShrink: 0, pointerEvents: 'none' }}>
+            VOICES WORLD CUP
+          </div>
+
+          {/* Countdown centered in remaining space */}
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
             <CountdownUI compact />
           </div>
 
-          {/* Sound + Theme */}
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => setMuted(!muted)} style={{ ...iconBtn, minWidth: 40, minHeight: 40 }} title={muted ? 'Son' : 'Muet'}>
-              {muted ? '🔇' : '🔊'}
-            </button>
-            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} style={{ ...iconBtn, minWidth: 40, minHeight: 40 }} title="Thème">
-              {isDark ? '☀️' : '🌙'}
-            </button>
-          </div>
+          {/* Theme */}
+          <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} style={{ ...iconBtn, minWidth: 40, minHeight: 40 }} title="Thème">
+            {isDark ? '☀️' : '🌙'}
+          </button>
         </div>
 
         {/* Mes Pixels — top right, below top bar (hidden when sidebar open) */}
@@ -185,31 +195,27 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
             onClick={() => setMobileMenuOpen(false)}
           >
             <div
+              onTouchStart={onRankSwipeStart}
+              onTouchMove={onRankSwipeMove}
+              onTouchEnd={onRankSwipeEnd}
               onClick={e => e.stopPropagation()}
               style={{
                 position: 'absolute', top: 0, left: 0, bottom: 0, width: 260,
                 background: isDark ? 'rgba(5,8,15,0.97)' : 'rgba(232,237,248,0.99)',
                 borderRight: `2px solid ${accent}`,
-                padding: '60px 18px 90px 18px',
+                padding: '20px 18px 90px 18px',
                 overflowY: 'auto',
-                animation: 'slideInLeft 0.25s cubic-bezier(0.16,1,0.3,1)',
+                animation: rankSwipeDelta === 0 ? 'slideInLeft 0.25s cubic-bezier(0.16,1,0.3,1)' : 'none',
+                transform: `translateX(${Math.min(0, rankSwipeDelta)}px)`,
+                transition: rankSwipeDelta === 0 ? 'transform 0.2s ease' : 'none',
                 display: 'flex', flexDirection: 'column',
+                touchAction: 'pan-y',
               }}
             >
-              {/* Close X */}
-              <button
-                onClick={() => setMobileMenuOpen(false)}
-                style={{
-                  position: 'absolute', top: 12, right: 12,
-                  background: 'none', border: 'none',
-                  color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(26,48,128,0.6)',
-                  fontSize: 20, cursor: 'pointer', lineHeight: 1,
-                  minWidth: 44, minHeight: 44,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: MONO,
-                }}
-              >✕</button>
-              <RankingRows />
+              <VWCTitle size={16} />
+              <div style={{ marginTop: 14 }}>
+                <RankingRows />
+              </div>
             </div>
           </div>
         )}
@@ -261,18 +267,23 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, pointerEvents: 'none' }}>
 
-      {/* Left panel: logo + full ranking (scrollable) */}
+      {/* Left panel: sticky title + scrollable ranking */}
       <div style={{
         position: 'absolute', top: 0, left: 0, bottom: 0,
         width: 264,
         background: leftBg,
         boxShadow: isDark ? 'none' : '4px 0 18px rgba(0,0,0,0.07)',
         display: 'flex', flexDirection: 'column',
-        padding: '14px 18px 90px 20px',
-        overflowY: 'auto',
         pointerEvents: 'auto',
       }}>
-        <RankingRows />
+        {/* Title — never scrolls away */}
+        <div style={{ padding: '14px 18px 10px 20px', flexShrink: 0 }}>
+          <VWCTitle size={20} />
+        </div>
+        {/* Ranking list — scrollable */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 18px 90px 20px' }}>
+          <RankingRows />
+        </div>
       </div>
 
       {/* Top gradient */}
@@ -287,14 +298,11 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
         <CountdownUI />
       </div>
 
-      {/* Top right: X VOIX + sound + theme */}
+      {/* Top right: X VOIX + theme */}
       <div style={{ position: 'absolute', top: 12, right: 20, display: 'flex', alignItems: 'center', gap: 10, pointerEvents: 'auto' }}>
         <div style={{ fontFamily: BEBAS, fontSize: 20, color: accent, letterSpacing: 2, lineHeight: 1 }}>
           {fmtVoix(totalVoices)} VOIX
         </div>
-        <button onClick={() => setMuted(!muted)} title={muted ? 'Activer le son' : 'Couper le son'} style={iconBtn}>
-          {muted ? '🔇' : '🔊'}
-        </button>
         <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title={isDark ? 'Mode clair' : 'Mode sombre'} style={iconBtn}>
           {isDark ? '☀️' : '🌙'}
         </button>

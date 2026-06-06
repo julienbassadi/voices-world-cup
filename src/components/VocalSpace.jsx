@@ -176,18 +176,6 @@ export default function VocalSpace({ country, pixel, onClose }) {
       }}
     >
 
-      {/* Close */}
-      <button onClick={onClose} style={{
-        position: 'absolute', top: 12, right: 14,
-        background: isLight ? 'rgba(26,48,128,0.08)' : 'rgba(255,255,255,0.08)',
-        border: `1px solid ${isLight ? 'rgba(26,48,128,0.18)' : 'rgba(255,255,255,0.15)'}`,
-        color: muted, fontSize: 16,
-        cursor: 'pointer', lineHeight: 1, fontFamily: MONO,
-        minWidth: 40, minHeight: 40,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        borderRadius: 4, zIndex: 1,
-      }}>✕</button>
-
       {/* Country header */}
       <div style={{ padding: '36px 20px 16px', paddingLeft: isMobile ? 20 : 52 }}>
         <div style={{ fontSize: isMobile ? 44 : 52, lineHeight: 1, marginBottom: 10 }}>{country.flag}</div>
