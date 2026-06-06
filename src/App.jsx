@@ -87,6 +87,7 @@ export default function App() {
 
   const handleAuthSuccess = useCallback(() => {
     setShowAuth(false)
+    useMapStore.getState().triggerZoomReset()
     const cb = authCallbackRef.current
     authCallbackRef.current = null
     cb?.()
@@ -113,10 +114,10 @@ export default function App() {
         sidebarOpen={sidebarOpen}
       />
 
-      {/* Transparent overlay behind sidebar — click anywhere on map closes it */}
-      {sidebarOpen && !countryModal && (
+      {/* Dark backdrop behind VocalSpace — click closes it */}
+      {pixelView && (
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 290 }}
+          style={{ position: 'fixed', inset: 0, zIndex: 290, background: 'rgba(0,0,0,0.45)' }}
           onClick={handleCloseSidebar}
         />
       )}

@@ -85,6 +85,8 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
   const overlayPathsRef = useRef({})
   const projCentroidRef = useRef(null)
   const callbacksRef    = useRef({ onCountryClick, onCountryHover })
+  const zoomRef         = useRef(null)
+  const zoomResetFirstRef = useRef(true)
 
   const [tooltip, setTooltip] = useState(null)
 
@@ -95,6 +97,7 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
   const pixelsByCountry = useMapStore(s => s.pixelsByCountry)
   const frPixelCount    = (pixelsByCountry.fr ?? []).length
   const frScale         = 1 + frPixelCount * 0.0008
+  const zoomResetKey    = useMapStore(s => s.zoomResetKey)
 
   // ─── D3 setup — runs once ────────────────────────────────────────────────
   useEffect(() => {
@@ -241,6 +244,7 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
         svg.property('__zoom', nt)
         useMapStore.getState().setZoomTransform(nt.k, nt.x, nt.y)
       })
+    zoomRef.current = zoom
     svg.call(zoom)
     svg.style('cursor', 'grab')
 
@@ -249,6 +253,14 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  // ─── Reset D3 zoom (e.g. after mobile auth) ───────────────────────────────
+  useEffect(() => {
+    if (zoomResetFirstRef.current) { zoomResetFirstRef.current = false; return }
+    if (zoomRef.current && svgRef.current) {
+      d3.select(svgRef.current).call(zoomRef.current.transform, d3.zoomIdentity)
+    }
+  }, [zoomResetKey])
 
   // ─── Sync pixel count → overlay intensity ─────────────────────────────────
   useEffect(() => {

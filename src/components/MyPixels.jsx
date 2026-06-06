@@ -8,25 +8,32 @@ import PixelShareModal from './PixelShareModal'
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
 
-export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobile = false }) {
+export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobile = false, forceClose = false, onOpen }) {
   const [isOpen, setIsOpen]               = useState(false)
   const [commentCounts, setCommentCounts] = useState({})
   const [sharePixel, setSharePixel]       = useState(null)
-  const swipeRef   = useRef({ startY: 0 })
+  const swipeRef   = useRef({ startX: 0 })
   const [swipeDelta, setSwipeDelta]       = useState(0)
 
+  // Close when parent signals (e.g. ranking opened, or sidebar opened)
+  useEffect(() => { if (forceClose) setIsOpen(false) }, [forceClose])
+
+  // Swipe LEFT to close the left sidebar
   const onSwipeStart = e => {
-    swipeRef.current.startY = e.touches[0].clientY
+    swipeRef.current.startX = e.touches[0].clientX
     setSwipeDelta(0)
   }
   const onSwipeMove = e => {
-    const delta = Math.max(0, e.touches[0].clientY - swipeRef.current.startY)
-    setSwipeDelta(delta)
+    const delta = e.touches[0].clientX - swipeRef.current.startX
+    setSwipeDelta(delta) // negative = swiping left
   }
   const onSwipeEnd = () => {
-    if (swipeDelta > 80) { setIsOpen(false); setSwipeDelta(0) }
+    if (swipeDelta < -80) { setIsOpen(false); setSwipeDelta(0) }
     else setSwipeDelta(0)
   }
+
+  const handleOpen = () => { onOpen?.(); setIsOpen(true) }
+  const handleClose = () => { setIsOpen(false); setSwipeDelta(0) }
 
   const user            = useAuthStore(s => s.user)
   const isLoggedIn      = useAuthStore(s => s.isLoggedIn)
@@ -203,7 +210,7 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobil
   // ── Toggle button (shared) ─────────────────────────────────────────────────
   const ToggleBtn = () => (
     <button
-      onClick={() => setIsOpen(o => !o)}
+      onClick={() => isOpen ? handleClose() : handleOpen()}
       style={{
         background: isDark ? 'rgba(5,8,15,0.82)' : 'rgba(232,237,248,0.95)',
         border: `1px solid ${dividerClr}`,
@@ -227,57 +234,59 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobil
     </button>
   )
 
-  // ── MOBILE: bottom sheet ───────────────────────────────────────────────────
+  // ── MOBILE: left sidebar ──────────────────────────────────────────────────
   if (isMobile) {
     return (
       <>
         <ToggleBtn />
 
         {isOpen && (
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.55)' }}
-            onClick={() => setIsOpen(false)}
-          >
+          <>
+            {/* Backdrop — click to close */}
             <div
-              onClick={e => e.stopPropagation()}
+              style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.55)' }}
+              onClick={handleClose}
+            />
+
+            {/* Left sidebar — swipe left to close */}
+            <div
+              onTouchStart={onSwipeStart}
+              onTouchMove={onSwipeMove}
+              onTouchEnd={onSwipeEnd}
               style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0,
+                position: 'fixed', top: 0, left: 0, bottom: 0,
+                width: 300,
                 background: panelBg,
-                borderTop: `2px solid ${accent}`,
-                borderRadius: '12px 12px 0 0',
-                maxHeight: '80vh',
+                borderRight: `2px solid ${accent}`,
+                zIndex: 1201,
                 display: 'flex', flexDirection: 'column',
-                animation: swipeDelta === 0 ? 'slideInUp 0.28s cubic-bezier(0.16,1,0.3,1)' : 'none',
-                transform: `translateY(${swipeDelta}px)`,
+                animation: swipeDelta === 0 ? 'slideInLeft 0.25s cubic-bezier(0.16,1,0.3,1)' : 'none',
+                transform: `translateX(${Math.min(0, swipeDelta)}px)`,
                 transition: swipeDelta === 0 ? 'transform 0.2s ease' : 'none',
+                touchAction: 'pan-y',
               }}
             >
-              {/* Drag zone — covers pill + header, catches swipe-down */}
-              <div
-                onTouchStart={onSwipeStart}
-                onTouchMove={onSwipeMove}
-                onTouchEnd={onSwipeEnd}
-                style={{ touchAction: 'none', cursor: 'grab', flexShrink: 0 }}
-              >
-                {/* Drag pill */}
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
-                  <div style={{ width: 36, height: 4, borderRadius: 2, background: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }} />
+              {/* Header */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '16px 16px 12px',
+                borderBottom: `1px solid ${dividerClr}`,
+                flexShrink: 0,
+              }}>
+                <div style={{ fontFamily: BEBAS, fontSize: 18, color: accent, letterSpacing: 2 }}>
+                  MES PIXELS
+                  {isLoggedIn && userPixels.length > 0 && (
+                    <span style={{ opacity: 0.6, marginLeft: 6, fontSize: 14 }}>({userPixels.length})</span>
+                  )}
                 </div>
-                {/* Sheet header */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '0 16px 10px',
-                  borderBottom: `1px solid ${dividerClr}`,
-                }}>
-                  <div style={{ fontFamily: BEBAS, fontSize: 16, color: accent, letterSpacing: 2 }}>
-                    MES PIXELS
-                    {isLoggedIn && userPixels.length > 0 && <span style={{ opacity: 0.6, marginLeft: 6, fontSize: 13 }}>({userPixels.length})</span>}
-                  </div>
-                  <button
-                    onClick={() => setIsOpen(false)}
-                    style={{ background: 'none', border: 'none', color: mutedColor, fontSize: 18, cursor: 'pointer', padding: '4px 8px', lineHeight: 1, fontFamily: MONO, minHeight: 44 }}
-                  >✕</button>
-                </div>
+                <button
+                  onClick={handleClose}
+                  style={{
+                    background: 'none', border: 'none', color: mutedColor,
+                    fontSize: 20, cursor: 'pointer', lineHeight: 1, fontFamily: MONO,
+                    minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >✕</button>
               </div>
 
               {/* Scrollable content */}
@@ -285,7 +294,7 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobil
                 <PanelContents />
               </div>
             </div>
-          </div>
+          </>
         )}
 
         {/* Share modal */}

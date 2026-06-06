@@ -44,16 +44,17 @@ export default function VocalSpace({ country, pixel, onClose }) {
   const [hasLiked, setHasLiked]         = useState(false)
   const [isLiking, setIsLiking]         = useState(false)
   const audioRef   = useRef(null)
-  const swipeRef   = useRef({ startY: 0 })
+  const swipeRef   = useRef({ startX: 0 })
   const [swipeDelta, setSwipeDelta] = useState(0)
 
+  // Swipe RIGHT to close the right sidebar
   const onSwipeStart = e => {
-    swipeRef.current.startY = e.touches[0].clientY
+    swipeRef.current.startX = e.touches[0].clientX
     setSwipeDelta(0)
   }
   const onSwipeMove = e => {
-    const delta = Math.max(0, e.touches[0].clientY - swipeRef.current.startY)
-    setSwipeDelta(delta)
+    const delta = Math.max(0, e.touches[0].clientX - swipeRef.current.startX)
+    setSwipeDelta(delta) // positive = swiping right
   }
   const onSwipeEnd = () => {
     if (swipeDelta > 80) { onClose(); setSwipeDelta(0) }
@@ -154,61 +155,41 @@ export default function VocalSpace({ country, pixel, onClose }) {
   const inputBdr   = isLight ? 'rgba(26,48,128,0.18)' : 'rgba(255,255,255,0.12)'
   const shadow     = isLight ? '0 2px 12px rgba(0,0,0,0.15)' : 'none'
 
-  const mobileSheet = isMobile ? {
-    bottom: 0, left: 0, right: 0,
-    width: 'auto', top: 'auto',
-    height: 'min(88vh, 720px)',
-    borderTop: `2px solid ${accent}`,
-    borderLeft: 'none',
-    borderRadius: '12px 12px 0 0',
-    animation: swipeDelta === 0 ? 'slideInUp 0.28s cubic-bezier(0.16,1,0.3,1)' : 'none',
-    transform: `translateY(${swipeDelta}px)`,
-    transition: swipeDelta === 0 ? 'transform 0.2s ease' : 'none',
-  } : {
-    right: 0, top: 0, bottom: 0, width: 320,
-    borderLeft: `2px solid ${accent}`,
-    animation: 'slideInRight 0.22s cubic-bezier(0.16,1,0.3,1)',
-  }
-
   return (
-    <div style={{
-      position: 'fixed',
-      ...mobileSheet,
-      background: sidebarBg,
-      boxShadow: shadow,
-      zIndex: 300,
-      display: 'flex', flexDirection: 'column',
-      overflowY: 'auto',
-    }}>
-
-      {/* Mobile drag zone (pill + swipe target) */}
-      {isMobile && (
-        <div
-          onTouchStart={onSwipeStart}
-          onTouchMove={onSwipeMove}
-          onTouchEnd={onSwipeEnd}
-          style={{ touchAction: 'none', cursor: 'grab', flexShrink: 0, display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}
-        >
-          <div style={{ width: 36, height: 4, borderRadius: 2, background: isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)' }} />
-        </div>
-      )}
+    <div
+      onTouchStart={isMobile ? onSwipeStart : undefined}
+      onTouchMove={isMobile ? onSwipeMove : undefined}
+      onTouchEnd={isMobile ? onSwipeEnd : undefined}
+      style={{
+        position: 'fixed', right: 0, top: 0, bottom: 0,
+        width: isMobile ? '82vw' : 320,
+        background: sidebarBg,
+        borderLeft: `2px solid ${accent}`,
+        boxShadow: shadow,
+        zIndex: 300,
+        display: 'flex', flexDirection: 'column',
+        overflowY: 'auto',
+        animation: swipeDelta === 0 ? 'slideInRight 0.22s cubic-bezier(0.16,1,0.3,1)' : 'none',
+        transform: `translateX(${swipeDelta}px)`,
+        transition: swipeDelta === 0 ? 'transform 0.2s ease' : 'none',
+        touchAction: isMobile ? 'pan-y' : 'auto',
+      }}
+    >
 
       {/* Close */}
       <button onClick={onClose} style={{
-        position: 'absolute',
-        top: isMobile ? 8 : 16,
-        ...(isMobile ? { right: 14 } : { left: 18 }),
+        position: 'absolute', top: 12, right: 14,
         background: isLight ? 'rgba(26,48,128,0.08)' : 'rgba(255,255,255,0.08)',
         border: `1px solid ${isLight ? 'rgba(26,48,128,0.18)' : 'rgba(255,255,255,0.15)'}`,
         color: muted, fontSize: 16,
         cursor: 'pointer', lineHeight: 1, fontFamily: MONO,
-        minWidth: 36, minHeight: 36,
+        minWidth: 40, minHeight: 40,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        borderRadius: 4,
+        borderRadius: 4, zIndex: 1,
       }}>✕</button>
 
       {/* Country header */}
-      <div style={{ padding: isMobile ? '8px 20px 16px' : '36px 28px 20px', paddingLeft: isMobile ? 20 : 52 }}>
+      <div style={{ padding: '36px 20px 16px', paddingLeft: isMobile ? 20 : 52 }}>
         <div style={{ fontSize: isMobile ? 44 : 52, lineHeight: 1, marginBottom: 10 }}>{country.flag}</div>
         <div style={{ fontFamily: BEBAS, fontSize: isMobile ? 26 : 32, color: accent, letterSpacing: 2 }}>
           {country.name}
@@ -218,10 +199,10 @@ export default function VocalSpace({ country, pixel, onClose }) {
         </div>
       </div>
 
-      <div style={{ height: 1, background: dividerClr, margin: '0 28px' }} />
+      <div style={{ height: 1, background: dividerClr, margin: isMobile ? '0 20px' : '0 28px' }} />
 
       {/* Buyer info */}
-      <div style={{ padding: '18px 28px 0' }}>
+      <div style={{ padding: isMobile ? '14px 20px 0' : '18px 28px 0' }}>
         <div style={{ fontFamily: MONO, fontSize: 9, color: muted, letterSpacing: 2, marginBottom: 6 }}>
           VOIX DE
         </div>
@@ -282,10 +263,10 @@ export default function VocalSpace({ country, pixel, onClose }) {
         </div>
       </div>
 
-      <div style={{ height: 1, background: dividerClr, margin: '0 28px' }} />
+      <div style={{ height: 1, background: dividerClr, margin: isMobile ? '0 20px' : '0 28px' }} />
 
       {/* Comments */}
-      <div style={{ padding: '18px 28px 32px', flex: 1 }}>
+      <div style={{ padding: isMobile ? '14px 20px 28px' : '18px 28px 32px', flex: 1 }}>
         <div style={{ fontFamily: BEBAS, fontSize: 18, color: accent, letterSpacing: 2, marginBottom: 14 }}>
           COMMENTAIRES ({comments.length})
         </div>

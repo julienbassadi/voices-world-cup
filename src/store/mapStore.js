@@ -27,6 +27,9 @@ const useMapStore = create((set, get) => ({
   zoomTransform: { k: 1, x: 0, y: 0 },
   setZoomTransform: (k, x, y) => set({ zoomTransform: { k, x, y } }),
 
+  zoomResetKey: 0,
+  triggerZoomReset: () => set(s => ({ zoomResetKey: s.zoomResetKey + 1 })),
+
   playingPixels: new Set(),
   setPlayingPixels: ids => set({ playingPixels: ids instanceof Set ? ids : new Set(ids) }),
 

@@ -40,6 +40,11 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
+  // One panel at a time: close ranking when sidebar/VocalSpace opens
+  useEffect(() => {
+    if (sidebarOpen) setMobileMenuOpen(false)
+  }, [sidebarOpen])
+
   const pixelsByCountry = useMapStore(s => s.pixelsByCountry)
   const totalVoices     = useMapStore(s => s.totalVoices)
 
@@ -165,7 +170,11 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
         {/* Mes Pixels — top right, below top bar (hidden when sidebar open) */}
         {!sidebarOpen && (
           <div style={{ position: 'absolute', top: 52, right: 12, left: 12, pointerEvents: 'auto' }}>
-            <MyPixels onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} isMobile />
+            <MyPixels
+              onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} isMobile
+              forceClose={mobileMenuOpen || sidebarOpen}
+              onOpen={() => setMobileMenuOpen(false)}
+            />
           </div>
         )}
 
@@ -294,7 +303,7 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
       {/* Top right: Mes Pixels panel (hidden when sidebar open) */}
       {!sidebarOpen && (
         <div style={{ position: 'absolute', top: 50, right: 20, width: 272, pointerEvents: 'auto' }}>
-          <MyPixels onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} />
+          <MyPixels onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} forceClose={sidebarOpen} />
         </div>
       )}
 
