@@ -3,17 +3,16 @@ import useMapStore from '../store/mapStore'
 import useAuthStore from '../store/authStore'
 import { supabase } from '../lib/supabase'
 import { QUALIFIED } from './WorldMap'
+import PixelShareModal from './PixelShareModal'
 
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
 
-const SHARE_BASE = 'https://voicesworldcup.vercel.app'
 
 export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth }) {
   const [isOpen, setIsOpen]               = useState(false)
   const [commentCounts, setCommentCounts] = useState({})
-  const [toastMsg, setToastMsg]           = useState(null)
-  const toastTimerRef = useRef(null)
+  const [sharePixel, setSharePixel]       = useState(null) // { px, country }
 
   const user            = useAuthStore(s => s.user)
   const isLoggedIn      = useAuthStore(s => s.isLoggedIn)
@@ -49,14 +48,6 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth }) {
       })
   }, [userPixels.length])
 
-  useEffect(() => () => clearTimeout(toastTimerRef.current), [])
-
-  const showToast = useCallback((msg) => {
-    setToastMsg(msg)
-    clearTimeout(toastTimerRef.current)
-    toastTimerRef.current = setTimeout(() => setToastMsg(null), 2000)
-  }, [])
-
   const handlePlay = useCallback((px) => {
     useMapStore.getState().setClickedPixel(px.countryIso, px.id)
   }, [])
@@ -67,22 +58,11 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth }) {
     onOpenVocalSpace?.({ country, pixel: px })
   }, [onOpenVocalSpace])
 
-  const handleShare = useCallback(async (px) => {
-    const url = `${SHARE_BASE}/pixel/${px.id}`
-    try {
-      await navigator.clipboard.writeText(url)
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = url
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
-    }
-    showToast('Lien copié !')
-  }, [showToast])
+  const handleShare = useCallback((px) => {
+    const country = QUALIFIED.find(c => c.iso === px.countryIso)
+    if (!country) return
+    setSharePixel({ px, country })
+  }, [])
 
   // ── Styles ────────────────────────────────────────────────────────────────
   const accent     = isDark ? '#E8C84A' : '#1a3080'
@@ -242,21 +222,14 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth }) {
         </div>
       )}
 
-      {/* Toast */}
-      {toastMsg && (
-        <div style={{
-          position: 'fixed', bottom: 88, right: 20,
-          background: isDark ? 'rgba(5,8,15,0.95)' : 'rgba(232,237,248,0.97)',
-          border: `1px solid ${accent}`,
-          color: accent,
-          fontFamily: MONO, fontSize: 11, letterSpacing: 1,
-          padding: '8px 14px',
-          zIndex: 2000, pointerEvents: 'none',
-          animation: 'slideInRight 0.18s ease',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.25)',
-        }}>
-          {toastMsg}
-        </div>
+      {/* Share modal */}
+      {sharePixel && (
+        <PixelShareModal
+          pixel={sharePixel.px}
+          country={sharePixel.country}
+          commentCount={commentCounts[sharePixel.px.id] ?? 0}
+          onClose={() => setSharePixel(null)}
+        />
       )}
     </>
   )
