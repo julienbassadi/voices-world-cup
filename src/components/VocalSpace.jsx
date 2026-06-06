@@ -8,7 +8,7 @@ const MONO  = "'DM Mono', monospace"
 const LIGHT_TEXT   = '#1a2040'
 const DARK_TEXT    = '#F0F0F0'
 const DARK_MUTED   = 'rgba(255,255,255,0.5)'
-const LIGHT_MUTED  = 'rgba(26,48,128,0.6)'
+const LIGHT_MUTED  = 'rgba(30,58,138,0.6)'
 
 function renderDescription(text) {
   if (!text) return null
@@ -150,9 +150,9 @@ export default function VocalSpace({ country, pixel, onClose }) {
   const muted      = isLight ? LIGHT_MUTED : DARK_MUTED
   const accent     = pixelColor
   const sidebarBg  = isLight ? '#ffffff' : 'var(--bg-secondary)'
-  const dividerClr = isLight ? 'rgba(26,48,128,0.12)' : `${pixelColor}28`
-  const inputBg    = isLight ? 'rgba(26,48,128,0.06)' : 'rgba(255,255,255,0.06)'
-  const inputBdr   = isLight ? 'rgba(26,48,128,0.18)' : 'rgba(255,255,255,0.12)'
+  const dividerClr = isLight ? 'rgba(30,58,138,0.12)' : `${pixelColor}28`
+  const inputBg    = isLight ? 'rgba(30,58,138,0.06)' : 'rgba(255,255,255,0.06)'
+  const inputBdr   = isLight ? 'rgba(30,58,138,0.18)' : 'rgba(255,255,255,0.12)'
   const shadow     = isLight ? '0 2px 12px rgba(0,0,0,0.15)' : 'none'
 
   return (

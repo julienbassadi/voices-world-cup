@@ -23,7 +23,7 @@
   --text-primary:   #0d1230;
   --text-muted:     rgba(13,18,48,0.52);
   --gradient-stop:  rgba(232,237,248,0.95);
-  --title-color:    #1a3080;
+  --title-color:    #1e3a8a;
   --input-bg:       #cdd6ee;
 }
 
@@ -86,7 +86,7 @@ body { margin: 0; overflow: hidden; }
 .sidebar-meta-input::placeholder,
 .vocal-space-input::placeholder  { color: rgba(255,255,255,0.35); }
 [data-theme="light"] .sidebar-meta-input::placeholder,
-[data-theme="light"] .vocal-space-input::placeholder  { color: rgba(26,48,128,0.38); }
+[data-theme="light"] .vocal-space-input::placeholder  { color: rgba(30,58,138,0.38); }
 
 /* ── Number input: hide native arrows ─────────────────────────── */
 input[type=number]::-webkit-outer-spin-button,

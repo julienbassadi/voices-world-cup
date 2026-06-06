@@ -23,7 +23,7 @@ const mkInput = (isLight) => ({
   width: '100%',
   boxSizing: 'border-box',
   background: isLight ? '#f0f4ff' : 'rgba(255,255,255,0.05)',
-  border: `1px solid ${isLight ? 'rgba(26,48,128,0.25)' : 'rgba(232,200,74,0.22)'}`,
+  border: `1px solid ${isLight ? 'rgba(30,58,138,0.25)' : 'rgba(232,200,74,0.22)'}`,
   color: isLight ? '#0d1230' : '#e8e8e8',
   fontFamily: MONO,
   fontSize: 13,
@@ -38,15 +38,15 @@ const mkPrimaryBtn = (isLight, disabled) => ({
   width: '100%',
   padding: '13px 0',
   background: disabled
-    ? (isLight ? 'rgba(26,48,128,0.06)' : 'rgba(255,255,255,0.04)')
+    ? (isLight ? 'rgba(30,58,138,0.06)' : 'rgba(255,255,255,0.04)')
     : (isLight
-        ? 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)'
+        ? 'linear-gradient(135deg, #1e3a8a 0%, #2952c0 100%)'
         : 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)'),
   border: disabled
-    ? `1px solid ${isLight ? 'rgba(26,48,128,0.15)' : 'rgba(255,255,255,0.08)'}`
+    ? `1px solid ${isLight ? 'rgba(30,58,138,0.15)' : 'rgba(255,255,255,0.08)'}`
     : 'none',
   color: disabled
-    ? (isLight ? 'rgba(26,48,128,0.35)' : 'rgba(255,255,255,0.2)')
+    ? (isLight ? 'rgba(30,58,138,0.35)' : 'rgba(255,255,255,0.2)')
     : (isLight ? '#ffffff' : '#05080F'),
   fontFamily: BEBAS,
   fontSize: 16,
@@ -114,11 +114,11 @@ export default function Auth({ onClose, onSuccess, initialTab = 'login' }) {
     }
   }
 
-  const accent      = isLight ? '#1a3080' : '#E8C84A'
+  const accent      = isLight ? '#1e3a8a' : '#E8C84A'
   const bg          = isLight ? '#ffffff' : '#0D1320'
-  const mutedColor  = isLight ? 'rgba(26,48,128,0.55)' : 'rgba(232,200,74,0.48)'
-  const divider     = isLight ? 'rgba(26,48,128,0.14)' : 'rgba(232,200,74,0.16)'
-  const checkBorder = isLight ? 'rgba(26,48,128,0.3)' : 'rgba(232,200,74,0.35)'
+  const mutedColor  = isLight ? 'rgba(30,58,138,0.55)' : 'rgba(232,200,74,0.48)'
+  const divider     = isLight ? 'rgba(30,58,138,0.14)' : 'rgba(232,200,74,0.16)'
+  const checkBorder = isLight ? 'rgba(30,58,138,0.3)' : 'rgba(232,200,74,0.35)'
   const shadow      = isLight ? '0 8px 48px rgba(0,0,0,0.18)' : '0 8px 48px rgba(0,0,0,0.65)'
 
   return (

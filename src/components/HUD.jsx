@@ -65,7 +65,7 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
   const canOpen = !!lastHoveredCountry
   const hoveredVoix = canOpen ? (pixelsByCountry[lastHoveredCountry.iso] ?? []).length : 0
 
-  const accent   = isDark ? '#E8C84A' : '#1a3080'
+  const accent   = isDark ? '#E8C84A' : '#1e3a8a'
   const leftBg   = isDark
     ? 'linear-gradient(to right, rgba(5,8,15,0.90) 0%, rgba(5,8,15,0.62) 72%, transparent 100%)'
     : 'linear-gradient(to right, rgba(232,237,248,0.97) 0%, rgba(232,237,248,0.70) 72%, transparent 100%)'
@@ -73,9 +73,9 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
   const bottomBg = isDark ? 'rgba(5,8,15,0.93)' : 'rgba(232,237,248,0.95)'
 
   const iconBtn = {
-    background: isDark ? 'none' : 'rgba(26,48,128,0.06)',
-    border: `1px solid ${isDark ? 'rgba(255,255,255,0.14)' : 'rgba(26,48,128,0.18)'}`,
-    color: isDark ? 'rgba(255,255,255,0.5)' : '#1a3080',
+    background: isDark ? 'none' : 'rgba(30,58,138,0.06)',
+    border: `1px solid ${isDark ? 'rgba(255,255,255,0.14)' : 'rgba(30,58,138,0.18)'}`,
+    color: isDark ? 'rgba(255,255,255,0.5)' : '#1e3a8a',
     fontSize: 13, cursor: 'pointer',
     borderRadius: 2, padding: '5px 8px', lineHeight: 1,
     minWidth: 32, minHeight: 32,
@@ -118,7 +118,7 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
       {[['JJ', jj], ['HH', hh], ['MM', mm], ['SS', ss]].map(([l, v], i) => (
         <div key={l} style={{ display: 'flex', alignItems: 'center' }}>
           {i > 0 && (
-            <span style={{ fontFamily: BEBAS, fontSize: compact ? 16 : 20, color: isDark ? 'rgba(232,200,74,0.3)' : 'rgba(26,48,128,0.22)', margin: '0 1px', paddingBottom: compact ? 4 : 6 }}>:</span>
+            <span style={{ fontFamily: BEBAS, fontSize: compact ? 16 : 20, color: isDark ? 'rgba(232,200,74,0.3)' : 'rgba(30,58,138,0.22)', margin: '0 1px', paddingBottom: compact ? 4 : 6 }}>:</span>
           )}
           <div style={{ textAlign: 'center', minWidth: compact ? 20 : 26 }}>
             <div style={{ fontFamily: BEBAS, fontSize: compact ? 20 : 24, color: isDark ? '#ffffff' : '#0d1230', lineHeight: 1 }}>{v}</div>
@@ -194,14 +194,14 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
                   style={{
                     width: '100%', minHeight: 52,
                     background: canOpen
-                      ? (isDark ? 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)' : 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)')
-                      : (isDark ? 'rgba(232,200,74,0.1)' : 'rgba(26,48,128,0.08)'),
+                      ? (isDark ? 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)' : 'linear-gradient(135deg, #1e3a8a 0%, #2952c0 100%)')
+                      : (isDark ? 'rgba(232,200,74,0.1)' : 'rgba(30,58,138,0.08)'),
                     border: 'none',
-                    color: canOpen ? (isDark ? '#05080F' : '#ffffff') : (isDark ? 'rgba(232,200,74,0.28)' : 'rgba(26,48,128,0.28)'),
+                    color: canOpen ? (isDark ? '#05080F' : '#ffffff') : (isDark ? 'rgba(232,200,74,0.28)' : 'rgba(30,58,138,0.28)'),
                     fontFamily: BEBAS, fontSize: 15, letterSpacing: 3,
                     cursor: canOpen ? 'pointer' : 'default',
                     borderRadius: 4, transition: 'background 0.2s, color 0.2s', whiteSpace: 'nowrap',
-                    boxShadow: (!isDark && canOpen) ? '0 2px 12px rgba(26,48,128,0.2)' : 'none',
+                    boxShadow: (!isDark && canOpen) ? '0 2px 12px rgba(30,58,138,0.2)' : 'none',
                   }}
                 >
                   {canOpen
@@ -314,16 +314,16 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
               pointerEvents: 'auto',
               clipPath: 'polygon(18px 0%, calc(100% - 18px) 0%, 100% 50%, calc(100% - 18px) 100%, 18px 100%, 0% 50%)',
               background: canOpen
-                ? (isDark ? 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)' : 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)')
-                : (isDark ? 'rgba(232,200,74,0.1)' : 'rgba(26,48,128,0.08)'),
+                ? (isDark ? 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)' : 'linear-gradient(135deg, #1e3a8a 0%, #2952c0 100%)')
+                : (isDark ? 'rgba(232,200,74,0.1)' : 'rgba(30,58,138,0.08)'),
               border: 'none',
-              color: canOpen ? (isDark ? '#05080F' : '#ffffff') : (isDark ? 'rgba(232,200,74,0.28)' : 'rgba(26,48,128,0.28)'),
+              color: canOpen ? (isDark ? '#05080F' : '#ffffff') : (isDark ? 'rgba(232,200,74,0.28)' : 'rgba(30,58,138,0.28)'),
               fontFamily: BEBAS, fontSize: 15, letterSpacing: 3,
               padding: '13px 52px',
               cursor: canOpen ? 'pointer' : 'default',
               transition: 'background 0.2s, color 0.2s',
               whiteSpace: 'nowrap',
-              boxShadow: (!isDark && canOpen) ? '0 2px 12px rgba(26,48,128,0.2)' : 'none',
+              boxShadow: (!isDark && canOpen) ? '0 2px 12px rgba(30,58,138,0.2)' : 'none',
             }}
           >
             {canOpen

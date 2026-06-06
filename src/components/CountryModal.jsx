@@ -413,16 +413,16 @@ export default function CountryModal({
 
   if (!country) return null
 
-  const accent     = isLight ? '#1a3080' : '#E8C84A'
+  const accent     = isLight ? '#1e3a8a' : '#E8C84A'
   const bg         = isLight ? '#ffffff' : '#0d1525'
-  const mutedColor = isLight ? 'rgba(26,48,128,0.6)' : 'rgba(255,255,255,0.45)'
-  const dividerClr = isLight ? 'rgba(26,48,128,0.12)' : 'rgba(232,200,74,0.12)'
+  const mutedColor = isLight ? 'rgba(30,58,138,0.6)' : 'rgba(255,255,255,0.45)'
+  const dividerClr = isLight ? 'rgba(30,58,138,0.12)' : 'rgba(232,200,74,0.12)'
 
   const canvasCursor = isDragging ? 'grabbing' : transform.scale > 1 ? 'grab' : 'crosshair'
 
   const zBtnBase = {
     width: 26, height: 26,
-    background: isLight ? 'rgba(26,48,128,0.1)' : 'rgba(5,8,15,0.8)',
+    background: isLight ? 'rgba(30,58,138,0.1)' : 'rgba(5,8,15,0.8)',
     border:     `1px solid ${accent}`,
     color:      accent,
     fontFamily: BEBAS, fontSize: 20, lineHeight: '24px',
@@ -568,9 +568,9 @@ export default function CountryModal({
               padding:      isMobile ? '14px 20px' : '12px 20px',
               minHeight:    isMobile ? 52 : 'auto',
               background:   pendingCount === 0
-                ? (isLight ? 'rgba(26,48,128,0.1)' : 'rgba(255,255,255,0.05)')
+                ? (isLight ? 'rgba(30,58,138,0.1)' : 'rgba(255,255,255,0.05)')
                 : (isLight
-                    ? 'linear-gradient(135deg,#1a3080,#2a45b0)'
+                    ? 'linear-gradient(135deg,#1e3a8a,#2952c0)'
                     : 'linear-gradient(135deg,#E8C84A,#c9a830)'),
               border:       'none',
               color:        pendingCount === 0

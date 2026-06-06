@@ -275,12 +275,12 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
 
   const progressPct = (timeLeft / 30) * 100
 
-  const accent     = isLight ? '#1a3080' : '#E8C84A'
+  const accent     = isLight ? '#1e3a8a' : '#E8C84A'
   const sidebarBg  = isLight ? '#ffffff' : 'var(--bg-secondary)'
-  const mutedColor = isLight ? 'rgba(26,48,128,0.6)' : 'var(--text-muted)'
-  const dividerClr = isLight ? 'rgba(26,48,128,0.12)' : 'rgba(232,200,74,0.12)'
-  const btnBg      = isLight ? '#1a3080' : 'rgba(255,255,255,0.04)'
-  const btnBorder  = isLight ? '#1a3080' : 'rgba(255,255,255,0.1)'
+  const mutedColor = isLight ? 'rgba(30,58,138,0.6)' : 'var(--text-muted)'
+  const dividerClr = isLight ? 'rgba(30,58,138,0.12)' : 'rgba(232,200,74,0.12)'
+  const btnBg      = isLight ? '#1e3a8a' : 'rgba(255,255,255,0.04)'
+  const btnBorder  = isLight ? '#1e3a8a' : 'rgba(255,255,255,0.1)'
   const btnColor   = isLight ? '#ffffff' : 'var(--text-muted)'
   const shadow     = isLight ? '0 2px 12px rgba(0,0,0,0.15)' : 'none'
 
@@ -362,7 +362,7 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
           className="sidebar-meta-input"
           style={{
             width: '100%', boxSizing: 'border-box',
-            background: isLight ? 'rgba(26,48,128,0.06)' : 'rgba(255,255,255,0.06)',
+            background: isLight ? 'rgba(30,58,138,0.06)' : 'rgba(255,255,255,0.06)',
             border: `1px solid ${dividerClr}`,
             color: isLight ? '#1a2040' : '#F0F0F0',
             fontFamily: MONO, fontSize: 11, letterSpacing: 0.5,
@@ -379,7 +379,7 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
           className="sidebar-meta-input"
           style={{
             width: '100%', boxSizing: 'border-box',
-            background: isLight ? 'rgba(26,48,128,0.06)' : 'rgba(255,255,255,0.06)',
+            background: isLight ? 'rgba(30,58,138,0.06)' : 'rgba(255,255,255,0.06)',
             border: `1px solid ${dividerClr}`,
             color: isLight ? '#1a2040' : '#F0F0F0',
             fontFamily: MONO, fontSize: 11, letterSpacing: 0.5,
@@ -469,7 +469,7 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
                 {timeLeft}s
               </span>
             </div>
-            <div style={{ height: 4, background: isLight ? 'rgba(26,48,128,0.12)' : 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
+            <div style={{ height: 4, background: isLight ? 'rgba(30,58,138,0.12)' : 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
               <div style={{
                 height: '100%',
                 width: `${progressPct}%`,
@@ -588,7 +588,7 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
             style={{
               width: '100%', padding: '15px 20px',
               background: isLight
-                ? 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)'
+                ? 'linear-gradient(135deg, #1e3a8a 0%, #2952c0 100%)'
                 : 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)',
               border: 'none',
               color: isLight ? '#ffffff' : '#05080F',
@@ -608,9 +608,9 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
             style={{
               width: '100%', padding: '15px 20px',
               background: isCommitting
-                ? (isLight ? 'rgba(26,48,128,0.15)' : 'rgba(255,255,255,0.06)')
+                ? (isLight ? 'rgba(30,58,138,0.15)' : 'rgba(255,255,255,0.06)')
                 : (isLight
-                    ? 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)'
+                    ? 'linear-gradient(135deg, #1e3a8a 0%, #2952c0 100%)'
                     : 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)'),
               border: 'none',
               color: isCommitting

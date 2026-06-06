@@ -84,14 +84,14 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobil
   }, [])
 
   // ── Styles ─────────────────────────────────────────────────────────────────
-  const accent     = isDark ? '#E8C84A' : '#1a3080'
+  const accent     = isDark ? '#E8C84A' : '#1e3a8a'
   const panelBg    = isDark ? 'rgba(5,8,15,0.95)' : 'rgba(232,237,248,0.98)'
-  const mutedColor = isDark ? 'rgba(255,255,255,0.40)' : 'rgba(26,48,128,0.52)'
-  const dividerClr = isDark ? 'rgba(232,200,74,0.10)' : 'rgba(26,48,128,0.10)'
+  const mutedColor = isDark ? 'rgba(255,255,255,0.40)' : 'rgba(30,58,138,0.52)'
+  const dividerClr = isDark ? 'rgba(232,200,74,0.10)' : 'rgba(30,58,138,0.10)'
 
   const iconBtnStyle = {
     background: 'none',
-    border: `1px solid ${isDark ? 'rgba(255,255,255,0.13)' : 'rgba(26,48,128,0.18)'}`,
+    border: `1px solid ${isDark ? 'rgba(255,255,255,0.13)' : 'rgba(30,58,138,0.18)'}`,
     color: mutedColor,
     fontSize: isMobile ? 13 : 10,
     cursor: 'pointer',
@@ -113,7 +113,7 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobil
         display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 7,
         padding: isMobile ? '10px 14px' : '7px 10px',
         borderBottom: `1px solid ${dividerClr}`,
-        background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(26,48,128,0.02)',
+        background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(30,58,138,0.02)',
       }}>
         <div style={{
           width: isMobile ? 14 : 12, height: isMobile ? 14 : 12, flexShrink: 0, borderRadius: 1,
@@ -146,7 +146,7 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobil
         onClick={() => { onOpenAuth?.('register'); if (isMobile) setIsOpen(false) }}
         style={{
           flex: 1,
-          background: isDark ? 'linear-gradient(135deg, #E8C84A, #c9a830)' : 'linear-gradient(135deg, #1a3080, #2a45b0)',
+          background: isDark ? 'linear-gradient(135deg, #E8C84A, #c9a830)' : 'linear-gradient(135deg, #1e3a8a, #2952c0)',
           border: 'none',
           color: isDark ? '#05080F' : '#ffffff',
           fontFamily: BEBAS, fontSize: isMobile ? 14 : 11, letterSpacing: 2,
@@ -159,8 +159,8 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobil
         style={{
           flex: 1,
           background: 'none',
-          border: `1px solid ${isDark ? 'rgba(232,200,74,0.30)' : 'rgba(26,48,128,0.25)'}`,
-          color: isDark ? 'rgba(232,200,74,0.75)' : '#1a3080',
+          border: `1px solid ${isDark ? 'rgba(232,200,74,0.30)' : 'rgba(30,58,138,0.25)'}`,
+          color: isDark ? 'rgba(232,200,74,0.75)' : '#1e3a8a',
           fontFamily: BEBAS, fontSize: isMobile ? 14 : 11, letterSpacing: 2,
           padding: isMobile ? '12px 0' : '8px 0', cursor: 'pointer', borderRadius: 3,
           minHeight: isMobile ? 48 : 'auto',
@@ -177,7 +177,7 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobil
         style={{
           width: '100%',
           background: 'none',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(26,48,128,0.14)'}`,
+          border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(30,58,138,0.14)'}`,
           color: mutedColor,
           fontFamily: BEBAS, fontSize: isMobile ? 12 : 10, letterSpacing: 2,
           padding: isMobile ? '10px 0' : '6px 0', cursor: 'pointer', borderRadius: 3,
