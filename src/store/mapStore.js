@@ -8,6 +8,7 @@ const mapPixel = p => ({
   lng: p.y,
   gridX: p.grid_x ?? null,
   gridY: p.grid_y ?? null,
+  createdAt: p.created_at ?? null,
   userId: p.user_id,
   audioUrl: p.audio_url,
   pseudo: p.pseudo ?? null,

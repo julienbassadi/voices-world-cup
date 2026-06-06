@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import useMapStore from '../store/mapStore'
 import { QUALIFIED } from './WorldMap'
+import MyPixels from './MyPixels'
 
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
@@ -26,7 +27,7 @@ function useCountdown() {
 
 const fmtVoix = n => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 
-export default function HUD({ lastHoveredCountry, onOpenSidebar }) {
+export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpace }) {
   const { jj, hh, mm, ss } = useCountdown()
 
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') ?? 'dark')
@@ -189,6 +190,15 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar }) {
             boxShadow: isDark ? 'none' : '0 1px 4px rgba(0,0,0,0.08)',
           }}
         >{isDark ? '☀️' : '🌙'}</button>
+      </div>
+
+      {/* ── Top right: Mes Pixels panel ── */}
+      <div style={{
+        position: 'absolute', top: 50, right: 20,
+        width: 272,
+        pointerEvents: 'auto',
+      }}>
+        <MyPixels onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} />
       </div>
 
       {/* ── Bottom: hexagonal CTA ── */}

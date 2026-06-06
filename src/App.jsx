@@ -63,6 +63,14 @@ export default function App() {
     [lastHoveredCountry]
   )
 
+  // "Mes Pixels" VocalSpace open → close modal/sidebar first
+  const handleHUDOpenVocalSpace = useCallback(({ country, pixel }) => {
+    setCountryModal(null)
+    setSelectedCountry(null)
+    useMapStore.getState().clearGridPendingPixels()
+    setPixelView({ country, pixel })
+  }, [])
+
   const handleNeedAuth = useCallback((cb) => {
     authCallbackRef.current = cb
     setShowAuth(true)
@@ -89,6 +97,7 @@ export default function App() {
       <HUD
         lastHoveredCountry={lastHoveredCountry}
         onOpenSidebar={handleOpenSidebar}
+        onOpenVocalSpace={handleHUDOpenVocalSpace}
       />
 
       {/* VocalSpace overlays everything */}
