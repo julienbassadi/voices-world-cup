@@ -75,6 +75,8 @@ const useMapStore = create((set, get) => ({
         country_iso: iso,
         grid_x:      gx,
         grid_y:      gy,
+        x:           0,  // legacy NOT NULL columns — no longer used for positioning
+        y:           0,
         audio_url:   audioUrl  ?? null,
         pseudo:      pseudo    ?? null,
         description: description ?? null,
