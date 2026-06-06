@@ -162,13 +162,14 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
           .attr('width', bw).attr('height', bh)
           .attr('preserveAspectRatio', 'xMidYMid slice')
 
-        // Flag background
-        cg.append('path')
+        // Flag background — transition on filter for brightness on hover
+        const flagPath = cg.append('path')
           .datum(feature).attr('d', pathGen)
           .attr('fill', `url(#${flagId})`)
           .attr('fill-opacity', 0.4)
           .attr('stroke', 'none')
           .attr('pointer-events', 'none')
+          .style('transition', 'filter 0.25s ease')
 
         // Intensity overlay — fill-opacity updated based on pixel count
         const overlayPath = cg.append('path')
@@ -188,12 +189,25 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
           .attr('stroke-width', 0.5)
           .attr('pointer-events', 'none')
 
+        // Hover glow — golden blurred stroke, hidden by default
+        const glowPath = cg.append('path')
+          .datum(feature).attr('d', pathGen)
+          .attr('fill', 'none')
+          .attr('stroke', '#E8C84A')
+          .attr('stroke-width', 3)
+          .attr('pointer-events', 'none')
+          .style('opacity', 0)
+          .style('filter', 'blur(3px)')
+          .style('transition', 'opacity 0.25s ease')
+
         // Transparent hit area for click/hover
         cg.append('path').datum(feature).attr('d', pathGen)
           .attr('fill', 'transparent')
           .attr('stroke', 'none')
           .style('cursor', 'pointer')
           .on('mouseover', function(event) {
+            flagPath.style('filter', 'brightness(1.3)')
+            glowPath.style('opacity', 0.55)
             callbacksRef.current.onCountryHover?.(country)
             svg.style('cursor', 'pointer')
             setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: 'VOIR LES PIXELS' })
@@ -202,6 +216,8 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
             setTooltip(t => t ? { ...t, x: event.clientX + 14, y: event.clientY - 10 } : null)
           })
           .on('mouseout', function() {
+            flagPath.style('filter', null)
+            glowPath.style('opacity', 0)
             setTooltip(null)
             svg.style('cursor', 'grab')
           })
