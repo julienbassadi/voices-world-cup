@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import useMapStore from '../store/mapStore'
 import useAuthStore from '../store/authStore'
+import { useMobile } from '../hooks/useMobile'
 
 const BEBAS       = "'Bebas Neue', Impact, sans-serif"
 const MONO        = "'DM Mono', monospace"
@@ -19,12 +20,15 @@ export default function CountryModal({
   onNeedAuth,
   onPixelDoubleClick,
 }) {
+  const isMobile = useMobile()
+
   const canvasRef       = useRef(null)
   const clickTimerRef   = useRef(null)
   const lastClickRef    = useRef(null)
-  const mouseDownRef    = useRef(null) // { clientX, clientY } — for drag/click distinction
-  const dragRef         = useRef(null) // { startClientX, startClientY, startOffsetX, startOffsetY }
+  const mouseDownRef    = useRef(null)
+  const dragRef         = useRef(null)
   const closeTimerRef   = useRef(null)
+  const touchHandlerRef = useRef({}) // stable refs for touch handlers
 
   const [hoveredCell, setHoveredCell] = useState(null)
   const [tooltip, setTooltip]         = useState(null)
@@ -159,6 +163,103 @@ export default function CountryModal({
     return () => canvas.removeEventListener('wheel', onWheel)
   }, [applyTransform])
 
+  // ── Keep touch handler refs fresh ────────────────────────────────────────
+  useEffect(() => {
+    touchHandlerRef.current = { applyTransform, handleClick: null }
+  })
+
+  // ── Touch pinch-zoom + pan (non-passive for preventDefault) ───────────────
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    let touchData = null
+
+    const onTouchStart = (e) => {
+      e.preventDefault()
+      if (e.touches.length === 1) {
+        const t = e.touches[0]
+        mouseDownRef.current = { clientX: t.clientX, clientY: t.clientY }
+        if (transformRef.current.scale > 1) {
+          dragRef.current = {
+            startClientX: t.clientX, startClientY: t.clientY,
+            startOffsetX: transformRef.current.offsetX,
+            startOffsetY: transformRef.current.offsetY,
+          }
+          setIsDragging(true)
+        }
+        touchData = { type: 'single' }
+      } else if (e.touches.length === 2) {
+        dragRef.current = null
+        mouseDownRef.current = null
+        setIsDragging(false)
+        const [t0, t1] = [e.touches[0], e.touches[1]]
+        touchData = {
+          type: 'pinch',
+          startDist: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY),
+          startScale: transformRef.current.scale,
+          startOffsetX: transformRef.current.offsetX,
+          startOffsetY: transformRef.current.offsetY,
+          cx: (t0.clientX + t1.clientX) / 2,
+          cy: (t0.clientY + t1.clientY) / 2,
+        }
+      }
+    }
+
+    const onTouchMove = (e) => {
+      e.preventDefault()
+      if (!touchData) return
+      if (e.touches.length === 1 && touchData.type === 'single' && dragRef.current) {
+        const rect  = canvas.getBoundingClientRect()
+        const ratio = CANVAS_SIZE / rect.width
+        const { startClientX, startClientY, startOffsetX, startOffsetY } = dragRef.current
+        const { scale } = transformRef.current
+        touchHandlerRef.current.applyTransform?.({
+          scale,
+          offsetX: clampOffset(startOffsetX + (e.touches[0].clientX - startClientX) * ratio, scale),
+          offsetY: clampOffset(startOffsetY + (e.touches[0].clientY - startClientY) * ratio, scale),
+        })
+      } else if (e.touches.length === 2 && touchData.type === 'pinch') {
+        const [t0, t1] = [e.touches[0], e.touches[1]]
+        const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY)
+        const { startDist, startScale, startOffsetX, startOffsetY, cx, cy } = touchData
+        const ns   = clamp(startScale * (dist / startDist), 1, 8)
+        const rect = canvas.getBoundingClientRect()
+        const ratio = CANVAS_SIZE / rect.width
+        const cX = (cx - rect.left) * ratio
+        const cY = (cy - rect.top) * ratio
+        touchHandlerRef.current.applyTransform?.({
+          scale: ns,
+          offsetX: clampOffset(cX - (cX - startOffsetX) * (ns / startScale), ns),
+          offsetY: clampOffset(cY - (cY - startOffsetY) * (ns / startScale), ns),
+        })
+      }
+    }
+
+    const onTouchEnd = (e) => {
+      if (touchData?.type === 'single' && e.changedTouches.length === 1) {
+        const t    = e.changedTouches[0]
+        const down = mouseDownRef.current
+        if (down && Math.abs(t.clientX - down.clientX) < 12 && Math.abs(t.clientY - down.clientY) < 12) {
+          touchHandlerRef.current.handleClick?.({ clientX: t.clientX, clientY: t.clientY })
+        }
+      }
+      touchData = null
+      dragRef.current = null
+      mouseDownRef.current = null
+      setIsDragging(false)
+    }
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false })
+    canvas.addEventListener('touchmove',  onTouchMove,  { passive: false })
+    canvas.addEventListener('touchend',   onTouchEnd)
+    return () => {
+      canvas.removeEventListener('touchstart', onTouchStart)
+      canvas.removeEventListener('touchmove',  onTouchMove)
+      canvas.removeEventListener('touchend',   onTouchEnd)
+    }
+  }, []) // stable — all values via refs
+
   // ── Coordinate helpers (only use refs — always stable) ────────────────────
   const toCanvasPos = useCallback((e) => {
     const rect = canvasRef.current.getBoundingClientRect()
@@ -231,6 +332,9 @@ export default function CountryModal({
     setTooltip(null)
   }, [endDrag])
 
+  // Keep handleClick ref fresh for touch handler
+  const handleClickRef = useRef(null)
+
   const handleClick = useCallback((e) => {
     // Ignore if mouse moved significantly (was a drag)
     const down = mouseDownRef.current
@@ -261,6 +365,12 @@ export default function CountryModal({
       useMapStore.getState().toggleGridPixel(country.iso, gx, gy)
     }
   }, [toCanvasPos, toCellCoords, pixelMap, country?.iso, onPixelDoubleClick])
+
+  // Sync handleClick into ref for touch handler
+  useEffect(() => {
+    handleClickRef.current = handleClick
+    touchHandlerRef.current.handleClick = handleClick
+  }, [handleClick])
 
   // ── Zoom buttons ──────────────────────────────────────────────────────────
   const zoomBy = useCallback((factor) => {
@@ -327,13 +437,13 @@ export default function CountryModal({
 
   return (
     <div
-      onClick={handleBackdropClick}
+      onClick={isMobile ? undefined : handleBackdropClick}
       style={{
         position:      'fixed', inset: 0,
-        background:    'rgba(0,0,0,0.75)',
+        background:    isMobile ? bg : 'rgba(0,0,0,0.75)',
         display:       'flex', alignItems: 'center', justifyContent: 'center',
         zIndex:        1000,
-        paddingRight:  sidebarOpen ? 320 : 0,
+        paddingRight:  (!isMobile && sidebarOpen) ? 320 : 0,
         transition:    'padding-right 0.22s cubic-bezier(0.16,1,0.3,1)',
         animation:     isClosing ? 'fadeOut 0.22s ease forwards' : 'none',
         pointerEvents: isClosing ? 'none' : undefined,
@@ -341,12 +451,12 @@ export default function CountryModal({
     >
       <div style={{
         background:    bg,
-        border:        `2px solid ${accent}`,
+        border:        isMobile ? 'none' : `2px solid ${accent}`,
         display:       'flex',
         flexDirection: 'column',
-        height:        'min(90vh, 720px)',
-        width:         660,
-        maxWidth:      '95vw',
+        height:        isMobile ? '100%' : 'min(90vh, 720px)',
+        width:         isMobile ? '100%' : 660,
+        maxWidth:      isMobile ? '100vw' : '95vw',
         animation:     isClosing
           ? 'slideOutDown 0.22s cubic-bezier(0.4,0,1,1) forwards'
           : 'slideInUp 0.22s cubic-bezier(0.16,1,0.3,1)',
@@ -370,9 +480,12 @@ export default function CountryModal({
           </div>
           <button onClick={startClose} style={{
             background: 'none', border: 'none', color: mutedColor,
-            fontSize: 20, cursor: 'pointer', padding: '4px 8px',
+            fontSize: isMobile ? 22 : 20,
+            cursor: 'pointer', padding: '4px 8px',
             lineHeight: 1, fontFamily: MONO, flexShrink: 0,
-          }}>✕</button>
+            minWidth: 44, minHeight: 44,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>{isMobile ? '←' : '✕'}</button>
         </div>
 
         {/* ── Grid area ── */}
@@ -405,6 +518,7 @@ export default function CountryModal({
                   aspectRatio:    '1 / 1',
                   cursor:         canvasCursor,
                   imageRendering: 'pixelated',
+                  touchAction:    'none',
                 }}
               />
             </div>
@@ -451,7 +565,8 @@ export default function CountryModal({
             onClick={handleBuyClick}
             disabled={pendingCount === 0}
             style={{
-              padding:      '12px 20px',
+              padding:      isMobile ? '14px 20px' : '12px 20px',
+              minHeight:    isMobile ? 52 : 'auto',
               background:   pendingCount === 0
                 ? (isLight ? 'rgba(26,48,128,0.1)' : 'rgba(255,255,255,0.05)')
                 : (isLight

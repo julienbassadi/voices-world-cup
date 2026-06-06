@@ -8,18 +8,16 @@ import PixelShareModal from './PixelShareModal'
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
 
-
-export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth }) {
+export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobile = false }) {
   const [isOpen, setIsOpen]               = useState(false)
   const [commentCounts, setCommentCounts] = useState({})
-  const [sharePixel, setSharePixel]       = useState(null) // { px, country }
+  const [sharePixel, setSharePixel]       = useState(null)
 
   const user            = useAuthStore(s => s.user)
   const isLoggedIn      = useAuthStore(s => s.isLoggedIn)
   const logout          = useAuthStore(s => s.logout)
   const pixelsByCountry = useMapStore(s => s.pixelsByCountry)
 
-  // Derive the current user's pixels from the global store (stays in sync with realtime)
   const userPixels = useMemo(() => {
     if (!user?.id) return []
     const result = []
@@ -34,12 +32,10 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth }) {
     })
   }, [pixelsByCountry, user?.id])
 
-  // Reload comment counts whenever the user pixel list length changes
   useEffect(() => {
     if (!userPixels.length) { setCommentCounts({}); return }
     supabase
-      .from('comments')
-      .select('pixel_id')
+      .from('comments').select('pixel_id')
       .in('pixel_id', userPixels.map(p => p.id))
       .then(({ data }) => {
         const counts = {}
@@ -56,7 +52,8 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth }) {
     const country = QUALIFIED.find(c => c.iso === px.countryIso)
     if (!country) return
     onOpenVocalSpace?.({ country, pixel: px })
-  }, [onOpenVocalSpace])
+    if (isMobile) setIsOpen(false)
+  }, [onOpenVocalSpace, isMobile])
 
   const handleShare = useCallback((px) => {
     const country = QUALIFIED.find(c => c.iso === px.countryIso)
@@ -64,49 +61,225 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth }) {
     setSharePixel({ px, country })
   }, [])
 
-  // ── Styles ────────────────────────────────────────────────────────────────
+  // ── Styles ─────────────────────────────────────────────────────────────────
   const accent     = isDark ? '#E8C84A' : '#1a3080'
-  const panelBg    = isDark ? 'rgba(5,8,15,0.90)' : 'rgba(232,237,248,0.97)'
+  const panelBg    = isDark ? 'rgba(5,8,15,0.95)' : 'rgba(232,237,248,0.98)'
   const mutedColor = isDark ? 'rgba(255,255,255,0.40)' : 'rgba(26,48,128,0.52)'
   const dividerClr = isDark ? 'rgba(232,200,74,0.10)' : 'rgba(26,48,128,0.10)'
-  const rowHoverBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(26,48,128,0.03)'
 
   const iconBtnStyle = {
     background: 'none',
     border: `1px solid ${isDark ? 'rgba(255,255,255,0.13)' : 'rgba(26,48,128,0.18)'}`,
     color: mutedColor,
-    fontSize: 10, cursor: 'pointer',
-    borderRadius: 2, padding: '2px 5px', lineHeight: 1.2,
+    fontSize: isMobile ? 13 : 10,
+    cursor: 'pointer',
+    borderRadius: 2,
+    padding: isMobile ? '6px 10px' : '2px 5px',
+    lineHeight: 1.2,
     fontFamily: MONO, flexShrink: 0,
+    minHeight: isMobile ? 36 : 'auto',
+    minWidth: isMobile ? 36 : 'auto',
   }
 
+  // ── Pixel row (shared) ─────────────────────────────────────────────────────
+  const PixelRow = ({ px }) => {
+    const country = QUALIFIED.find(c => c.iso === px.countryIso)
+    if (!country) return null
+    const cCount = commentCounts[px.id] ?? 0
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 7,
+        padding: isMobile ? '10px 14px' : '7px 10px',
+        borderBottom: `1px solid ${dividerClr}`,
+        background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(26,48,128,0.02)',
+      }}>
+        <div style={{
+          width: isMobile ? 14 : 12, height: isMobile ? 14 : 12, flexShrink: 0, borderRadius: 1,
+          background: px.color ?? '#E8C84A',
+          border: '1px solid rgba(255,255,255,0.12)',
+        }} />
+        <span style={{ fontSize: isMobile ? 16 : 12, lineHeight: 1, flexShrink: 0 }}>{country.flag}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: BEBAS, fontSize: isMobile ? 13 : 10, color: accent, letterSpacing: 1, lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {country.name.toUpperCase()}
+          </div>
+          <div style={{ display: 'flex', gap: 5, marginTop: 2 }}>
+            <span style={{ fontFamily: MONO, fontSize: isMobile ? 10 : 8, color: mutedColor }}>♥ {px.likes}</span>
+            <span style={{ fontFamily: MONO, fontSize: isMobile ? 10 : 8, color: mutedColor }}>💬 {cCount}</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: isMobile ? 6 : 3, flexShrink: 0 }}>
+          <button onClick={() => handlePlay(px)} style={iconBtnStyle} title="Écouter">▶</button>
+          <button onClick={() => handleView(px)} style={iconBtnStyle} title="Voir">💬</button>
+          <button onClick={() => handleShare(px)} style={iconBtnStyle} title="Partager">🔗</button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Auth buttons (not logged in) ───────────────────────────────────────────
+  const AuthButtons = () => (
+    <div style={{ padding: isMobile ? '14px' : '10px 10px', display: 'flex', gap: 8 }}>
+      <button
+        onClick={() => { onOpenAuth?.('register'); if (isMobile) setIsOpen(false) }}
+        style={{
+          flex: 1,
+          background: isDark ? 'linear-gradient(135deg, #E8C84A, #c9a830)' : 'linear-gradient(135deg, #1a3080, #2a45b0)',
+          border: 'none',
+          color: isDark ? '#05080F' : '#ffffff',
+          fontFamily: BEBAS, fontSize: isMobile ? 14 : 11, letterSpacing: 2,
+          padding: isMobile ? '12px 0' : '8px 0', cursor: 'pointer', borderRadius: 3,
+          minHeight: isMobile ? 48 : 'auto',
+        }}
+      >S'INSCRIRE</button>
+      <button
+        onClick={() => { onOpenAuth?.('login'); if (isMobile) setIsOpen(false) }}
+        style={{
+          flex: 1,
+          background: 'none',
+          border: `1px solid ${isDark ? 'rgba(232,200,74,0.30)' : 'rgba(26,48,128,0.25)'}`,
+          color: isDark ? 'rgba(232,200,74,0.75)' : '#1a3080',
+          fontFamily: BEBAS, fontSize: isMobile ? 14 : 11, letterSpacing: 2,
+          padding: isMobile ? '12px 0' : '8px 0', cursor: 'pointer', borderRadius: 3,
+          minHeight: isMobile ? 48 : 'auto',
+        }}
+      >SE CONNECTER</button>
+    </div>
+  )
+
+  // ── Logout ─────────────────────────────────────────────────────────────────
+  const LogoutBtn = () => (
+    <div style={{ padding: isMobile ? '10px 14px 20px' : '8px 10px', borderTop: `1px solid ${dividerClr}` }}>
+      <button
+        onClick={() => { logout(); setIsOpen(false) }}
+        style={{
+          width: '100%',
+          background: 'none',
+          border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(26,48,128,0.14)'}`,
+          color: mutedColor,
+          fontFamily: BEBAS, fontSize: isMobile ? 12 : 10, letterSpacing: 2,
+          padding: isMobile ? '10px 0' : '6px 0', cursor: 'pointer', borderRadius: 3,
+          minHeight: isMobile ? 44 : 'auto',
+        }}
+      >SE DÉCONNECTER</button>
+    </div>
+  )
+
+  // ── Panel contents ─────────────────────────────────────────────────────────
+  const PanelContents = () => (
+    <>
+      {!isLoggedIn ? (
+        <AuthButtons />
+      ) : userPixels.length === 0 ? (
+        <div style={{
+          padding: isMobile ? '20px 14px' : '16px 12px',
+          fontFamily: MONO, fontSize: isMobile ? 12 : 10, color: mutedColor,
+          textAlign: 'center', letterSpacing: 0.5, lineHeight: 1.7,
+        }}>
+          Vous n'avez pas encore<br />acheté de pixel
+        </div>
+      ) : (
+        userPixels.map(px => <PixelRow key={px.id} px={px} />)
+      )}
+      {isLoggedIn && <LogoutBtn />}
+    </>
+  )
+
+  // ── Toggle button (shared) ─────────────────────────────────────────────────
+  const ToggleBtn = () => (
+    <button
+      onClick={() => setIsOpen(o => !o)}
+      style={{
+        background: isDark ? 'rgba(5,8,15,0.82)' : 'rgba(232,237,248,0.95)',
+        border: `1px solid ${dividerClr}`,
+        color: accent,
+        fontFamily: BEBAS, fontSize: isMobile ? 13 : 12, letterSpacing: 2,
+        cursor: 'pointer', padding: isMobile ? '8px 12px' : '5px 10px',
+        display: 'flex', alignItems: 'center', gap: 6,
+        width: '100%', justifyContent: 'space-between',
+        backdropFilter: 'blur(6px)',
+        minHeight: isMobile ? 44 : 'auto',
+        borderRadius: isMobile ? 4 : 0,
+      }}
+    >
+      <span>
+        MES PIXELS
+        {isLoggedIn && userPixels.length > 0 && (
+          <span style={{ opacity: 0.7, marginLeft: 5 }}>({userPixels.length})</span>
+        )}
+      </span>
+      <span style={{ fontSize: 7, opacity: 0.6, fontFamily: MONO, transform: isOpen ? 'none' : 'rotate(180deg)', display: 'inline-block' }}>▲</span>
+    </button>
+  )
+
+  // ── MOBILE: bottom sheet ───────────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <>
+        <ToggleBtn />
+
+        {isOpen && (
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.55)' }}
+            onClick={() => setIsOpen(false)}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                background: panelBg,
+                borderTop: `2px solid ${accent}`,
+                borderRadius: '12px 12px 0 0',
+                maxHeight: '80vh',
+                display: 'flex', flexDirection: 'column',
+                animation: 'slideInUp 0.28s cubic-bezier(0.16,1,0.3,1)',
+              }}
+            >
+              {/* Sheet header */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '14px 16px 10px',
+                borderBottom: `1px solid ${dividerClr}`,
+                flexShrink: 0,
+              }}>
+                {/* Drag pill */}
+                <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', width: 36, height: 4, borderRadius: 2, background: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }} />
+                <div style={{ fontFamily: BEBAS, fontSize: 16, color: accent, letterSpacing: 2 }}>
+                  MES PIXELS
+                  {isLoggedIn && userPixels.length > 0 && <span style={{ opacity: 0.6, marginLeft: 6, fontSize: 13 }}>({userPixels.length})</span>}
+                </div>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  style={{ background: 'none', border: 'none', color: mutedColor, fontSize: 18, cursor: 'pointer', padding: '4px 8px', lineHeight: 1, fontFamily: MONO, minHeight: 44 }}
+                >✕</button>
+              </div>
+
+              {/* Scrollable content */}
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                <PanelContents />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Share modal */}
+        {sharePixel && (
+          <PixelShareModal
+            pixel={sharePixel.px}
+            country={sharePixel.country}
+            commentCount={commentCounts[sharePixel.px.id] ?? 0}
+            onClose={() => setSharePixel(null)}
+          />
+        )}
+      </>
+    )
+  }
+
+  // ── DESKTOP: dropdown panel ────────────────────────────────────────────────
   return (
     <>
-      {/* ── Toggle header ── */}
-      <button
-        onClick={() => setIsOpen(o => !o)}
-        style={{
-          background: isDark ? 'rgba(5,8,15,0.78)' : 'rgba(232,237,248,0.94)',
-          border: `1px solid ${dividerClr}`,
-          color: accent,
-          fontFamily: BEBAS, fontSize: 12, letterSpacing: 2,
-          cursor: 'pointer', padding: '5px 10px',
-          display: 'flex', alignItems: 'center', gap: 6,
-          width: '100%', justifyContent: 'space-between',
-          boxShadow: isDark ? 'none' : '0 1px 4px rgba(0,0,0,0.07)',
-          backdropFilter: 'blur(6px)',
-        }}
-      >
-        <span>
-          MES PIXELS
-          {isLoggedIn && userPixels.length > 0 && (
-            <span style={{ opacity: 0.7, marginLeft: 5 }}>({userPixels.length})</span>
-          )}
-        </span>
-        <span style={{ fontSize: 7, opacity: 0.6, fontFamily: MONO, transform: isOpen ? 'none' : 'rotate(180deg)', display: 'inline-block' }}>▲</span>
-      </button>
+      <ToggleBtn />
 
-      {/* ── Panel ── */}
       {isOpen && (
         <div style={{
           background: panelBg,
@@ -116,113 +289,10 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth }) {
           overflowY: 'auto',
           backdropFilter: 'blur(8px)',
         }}>
-          {!isLoggedIn ? (
-            <div style={{ padding: '10px 10px', display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => onOpenAuth?.('register')}
-                style={{
-                  flex: 1,
-                  background: isDark
-                    ? 'linear-gradient(135deg, #E8C84A, #c9a830)'
-                    : 'linear-gradient(135deg, #1a3080, #2a45b0)',
-                  border: 'none',
-                  color: isDark ? '#05080F' : '#ffffff',
-                  fontFamily: BEBAS, fontSize: 11, letterSpacing: 2,
-                  padding: '8px 0', cursor: 'pointer', borderRadius: 2,
-                }}
-              >
-                S'INSCRIRE
-              </button>
-              <button
-                onClick={() => onOpenAuth?.('login')}
-                style={{
-                  flex: 1,
-                  background: 'none',
-                  border: `1px solid ${isDark ? 'rgba(232,200,74,0.30)' : 'rgba(26,48,128,0.25)'}`,
-                  color: isDark ? 'rgba(232,200,74,0.75)' : '#1a3080',
-                  fontFamily: BEBAS, fontSize: 11, letterSpacing: 2,
-                  padding: '8px 0', cursor: 'pointer', borderRadius: 2,
-                }}
-              >
-                SE CONNECTER
-              </button>
-            </div>
-          ) : userPixels.length === 0 ? (
-            <div style={{
-              padding: '16px 12px',
-              fontFamily: MONO, fontSize: 10, color: mutedColor,
-              textAlign: 'center', letterSpacing: 0.5, lineHeight: 1.7,
-            }}>
-              Vous n'avez pas encore<br />acheté de pixel
-            </div>
-          ) : userPixels.map(px => {
-            const country = QUALIFIED.find(c => c.iso === px.countryIso)
-            if (!country) return null
-            const cCount = commentCounts[px.id] ?? 0
-            return (
-              <div key={px.id} style={{
-                display: 'flex', alignItems: 'center', gap: 7,
-                padding: '7px 10px',
-                borderBottom: `1px solid ${dividerClr}`,
-                background: rowHoverBg,
-              }}>
-                {/* Color swatch */}
-                <div style={{
-                  width: 12, height: 12, flexShrink: 0, borderRadius: 1,
-                  background: px.color ?? '#E8C84A',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                }} />
-
-                {/* Flag */}
-                <span style={{ fontSize: 12, lineHeight: 1, flexShrink: 0 }}>{country.flag}</span>
-
-                {/* Name + stats */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontFamily: BEBAS, fontSize: 10, color: accent,
-                    letterSpacing: 1, lineHeight: 1,
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  }}>
-                    {country.name.toUpperCase()}
-                  </div>
-                  <div style={{ display: 'flex', gap: 5, marginTop: 2 }}>
-                    <span style={{ fontFamily: MONO, fontSize: 8, color: mutedColor }}>♥ {px.likes}</span>
-                    <span style={{ fontFamily: MONO, fontSize: 8, color: mutedColor }}>💬 {cCount}</span>
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
-                  <button onClick={() => handlePlay(px)} style={iconBtnStyle} title="Écouter">▶</button>
-                  <button onClick={() => handleView(px)} style={iconBtnStyle} title="Voir les commentaires">💬</button>
-                  <button onClick={() => handleShare(px)} style={iconBtnStyle} title="Copier le lien">🔗</button>
-                </div>
-              </div>
-            )
-          })}
-          {/* Logout button — only shown when logged in */}
-          {isLoggedIn && (
-            <div style={{ padding: '8px 10px', borderTop: `1px solid ${dividerClr}` }}>
-              <button
-                onClick={() => logout()}
-                style={{
-                  width: '100%',
-                  background: 'none',
-                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(26,48,128,0.14)'}`,
-                  color: mutedColor,
-                  fontFamily: BEBAS, fontSize: 10, letterSpacing: 2,
-                  padding: '6px 0', cursor: 'pointer', borderRadius: 2,
-                  transition: 'opacity 0.15s',
-                }}
-              >
-                SE DÉCONNECTER
-              </button>
-            </div>
-          )}
+          <PanelContents />
         </div>
       )}
 
-      {/* Share modal */}
       {sharePixel && (
         <PixelShareModal
           pixel={sharePixel.px}

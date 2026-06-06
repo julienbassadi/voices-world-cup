@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import useMapStore from '../store/mapStore'
 import useAuthStore from '../store/authStore'
 import { supabase } from '../lib/supabase'
+import { useMobile } from '../hooks/useMobile'
 
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
 
 export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) {
+  const isMobile = useMobile()
   const [recState, setRecState]     = useState('idle')
   const [timeLeft, setTimeLeft]     = useState(30)
   const [isPlaying, setIsPlaying]   = useState(false)
@@ -270,30 +272,52 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
   const confirmActive = recState === 'idle' && pendingCount > 0
   const commitActive  = recState === 'validated' && pendingCount > 0
 
+  const mobileSheet = isMobile ? {
+    bottom: 0, left: 0, right: 0,
+    width: 'auto',
+    height: 'min(90vh, 660px)',
+    top: 'auto',
+    borderTop: `2px solid ${accent}`,
+    borderLeft: 'none',
+    borderRadius: '12px 12px 0 0',
+    animation: 'slideInUp 0.28s cubic-bezier(0.16,1,0.3,1)',
+  } : {
+    right: 0, top: 0, bottom: 0, width: 320,
+    borderLeft: `2px solid ${accent}`,
+    animation: 'slideInRight 0.22s cubic-bezier(0.16,1,0.3,1)',
+  }
+
   return (
     <div style={{
-      position: 'fixed', right: 0, top: 0, bottom: 0, width: 320,
+      position: 'fixed',
+      ...mobileSheet,
       background: sidebarBg,
-      borderLeft: `2px solid ${accent}`,
       boxShadow: shadow,
       zIndex,
       display: 'flex', flexDirection: 'column',
-      animation: 'slideInRight 0.22s cubic-bezier(0.16,1,0.3,1)',
       overflowY: 'auto',
     }}>
+      {/* Drag pill on mobile */}
+      {isMobile && (
+        <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', width: 36, height: 4, borderRadius: 2, background: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }} />
+      )}
 
       {/* Close */}
       <button onClick={onClose} style={{
-        position: 'absolute', top: 16, left: 18,
+        position: 'absolute',
+        top: 16,
+        ...(isMobile ? { right: 16 } : { left: 18 }),
         background: 'none', border: 'none',
         color: mutedColor, fontSize: 20,
         cursor: 'pointer', lineHeight: 1, padding: 6, fontFamily: MONO,
+        minWidth: 44, minHeight: 44,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>✕</button>
 
       {/* Country header */}
-      <div style={{ padding: '36px 28px 20px', paddingLeft: 52 }}>
-        <div style={{ fontSize: 52, lineHeight: 1, marginBottom: 10 }}>{country.flag}</div>
-        <div style={{ fontFamily: BEBAS, fontSize: 32, color: accent, letterSpacing: 2 }}>
+      <div style={{ padding: isMobile ? '28px 20px 16px' : '36px 28px 20px', paddingLeft: isMobile ? 20 : 52 }}>
+        <div style={{ fontSize: isMobile ? 44 : 52, lineHeight: 1, marginBottom: 10 }}>{country.flag}</div>
+        <div style={{ fontFamily: BEBAS, fontSize: isMobile ? 26 : 32, color: accent, letterSpacing: 2 }}>
           {country.name}
         </div>
         <div style={{ fontFamily: MONO, color: mutedColor, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>
@@ -301,10 +325,10 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
         </div>
       </div>
 
-      <div style={{ height: 1, background: dividerClr, margin: '0 28px' }} />
+      <div style={{ height: 1, background: dividerClr, margin: isMobile ? '0 20px' : '0 28px' }} />
 
       {/* ── Meta: pseudo, description, color ── */}
-      <div style={{ padding: '14px 28px 0' }}>
+      <div style={{ padding: isMobile ? '12px 20px 0' : '14px 28px 0' }}>
         <input
           type="text"
           value={pseudo}
@@ -360,10 +384,10 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
         </div>
       </div>
 
-      <div style={{ height: 1, background: dividerClr, margin: '14px 28px 0' }} />
+      <div style={{ height: 1, background: dividerClr, margin: isMobile ? '10px 20px 0' : '14px 28px 0' }} />
 
       {/* ── Recording section ── */}
-      <div style={{ padding: '18px 28px 0' }}>
+      <div style={{ padding: isMobile ? '14px 20px 0' : '18px 28px 0' }}>
 
         {/* IDLE */}
         {recState === 'idle' && (
@@ -517,7 +541,7 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
       </div>
 
       {/* ── Bottom — pinned buttons ── */}
-      <div style={{ marginTop: 'auto', padding: '20px 28px 32px' }}>
+      <div style={{ marginTop: 'auto', padding: isMobile ? '16px 20px 28px' : '20px 28px 32px' }}>
 
         {uploadError && (
           <div style={{ fontFamily: MONO, color: '#EF4444', fontSize: 10, letterSpacing: 0.5, marginBottom: 10 }}>
