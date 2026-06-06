@@ -5,7 +5,6 @@ import worldTopo from 'world-atlas/countries-110m.json'
 import franceData from '../data/france.json'
 import useMapStore from '../store/mapStore'
 
-const CELL = 3
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 
 const WORLD_FEATURES = topojson.feature(worldTopo, worldTopo.objects.countries).features
@@ -79,49 +78,23 @@ export const QUALIFIED = [
 const toWorldId = n => String(n).padStart(3, '0')
 const QUALIFIED_IDS = new Set(QUALIFIED.map(c => toWorldId(c.numId)))
 
-function buildGrid(projection, feature) {
-  const pathGen = d3.geoPath().projection(projection)
-  const [[x0, y0], [x1, y1]] = pathGen.bounds(feature)
-  const cells = []
-  const cols = Math.ceil((x1 - x0) / CELL)
-  const rows = Math.ceil((y1 - y0) / CELL)
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const x = x0 + col * CELL
-      const y = y0 + row * CELL
-      const geo = projection.invert([x + CELL / 2, y + CELL / 2])
-      if (geo && d3.geoContains(feature, geo))
-        cells.push({ id: `${row}:${col}`, x, y, lat: geo[1], lng: geo[0] })
-    }
-  }
-  return cells
-}
-
-export default function WorldMap({ onCountryClick, onCountryHover, onPixelDoubleClick }) {
+export default function WorldMap({ onCountryClick, onCountryHover }) {
   const svgRef          = useRef(null)
   const containerRef    = useRef(null)
   const groupsRef       = useRef({})
-  const cellsGroupsRef  = useRef({})
+  const overlayPathsRef = useRef({})
   const projCentroidRef = useRef(null)
-  const projectionRef   = useRef(null)
-  const occupiedMaps    = useRef({})
-  const pixelsMaps      = useRef({})
-  const callbacksRef    = useRef({ onCountryClick, onCountryHover, onPixelDoubleClick })
-  const clickTimerRef   = useRef(null)
-  const lastClickRef    = useRef(null)
+  const callbacksRef    = useRef({ onCountryClick, onCountryHover })
 
   const [tooltip, setTooltip] = useState(null)
 
   useEffect(() => {
-    callbacksRef.current = { onCountryClick, onCountryHover, onPixelDoubleClick }
-  }, [onCountryClick, onCountryHover, onPixelDoubleClick])
+    callbacksRef.current = { onCountryClick, onCountryHover }
+  }, [onCountryClick, onCountryHover])
 
-  const pixelsByCountry  = useMapStore(s => s.pixelsByCountry)
-  const playingPixels    = useMapStore(s => s.playingPixels)
-  const pendingPixels    = useMapStore(s => s.pendingPixels)
-  const confirmedPixels  = useMapStore(s => s.confirmedPixels)
-  const frPixelCount = (pixelsByCountry.fr ?? []).length
-  const frScale = 1 + frPixelCount * 0.0008
+  const pixelsByCountry = useMapStore(s => s.pixelsByCountry)
+  const frPixelCount    = (pixelsByCountry.fr ?? []).length
+  const frScale         = 1 + frPixelCount * 0.0008
 
   // ─── D3 setup — runs once ────────────────────────────────────────────────
   useEffect(() => {
@@ -138,29 +111,17 @@ export default function WorldMap({ onCountryClick, onCountryHover, onPixelDouble
 
     const projection = d3.geoMercator()
       .fitExtent([[0, 0], [width, height]], WORLD_EXTENT)
-    projectionRef.current = projection
     const pathGen = d3.geoPath().projection(projection)
 
     const tileW = 2 * Math.PI * projection.scale()
-
     projCentroidRef.current = projection(d3.geoCentroid(franceData))
-
-    const precomputed = {}
-    QUALIFIED.forEach(country => {
-      const feature = country.iso === 'fr'
-        ? franceData
-        : WORLD_FEATURES.find(f => f.id === toWorldId(country.numId))
-      if (!feature) return
-      const cells = buildGrid(projection, feature)
-      useMapStore.getState().setCells(country.iso, cells)
-      precomputed[country.iso] = { feature, cells }
-    })
 
     ;[-1, 0, 1].forEach(dx => {
       const suf  = dx === -1 ? 'L' : dx === 1 ? 'R' : 'C'
       const tile = g.append('g')
       if (dx !== 0) tile.attr('transform', `translate(${dx * tileW}, 0)`)
 
+      // Non-qualified countries
       tile.selectAll('path.country')
         .data(WORLD_FEATURES.filter(f => !QUALIFIED_IDS.has(f.id)))
         .join('path')
@@ -171,17 +132,18 @@ export default function WorldMap({ onCountryClick, onCountryHover, onPixelDouble
         .attr('stroke-width', 0.5)
         .attr('pointer-events', 'none')
 
+      // Qualified countries
       QUALIFIED.forEach(country => {
-        const pre = precomputed[country.iso]
-        if (!pre) return
-        const { feature, cells } = pre
+        const feature = country.iso === 'fr'
+          ? franceData
+          : WORLD_FEATURES.find(f => f.id === toWorldId(country.numId))
+        if (!feature) return
 
         const [[bx, by], [bx1, by1]] = pathGen.bounds(feature)
         const bw = bx1 - bx
         const bh = by1 - by
 
         const flagId = `flag-${country.iso}-${suf}`
-        const clipId = `clip-${country.iso}-${suf}`
 
         const cg = tile.append('g')
         if (!groupsRef.current[country.iso]) groupsRef.current[country.iso] = []
@@ -200,6 +162,7 @@ export default function WorldMap({ onCountryClick, onCountryHover, onPixelDouble
           .attr('width', bw).attr('height', bh)
           .attr('preserveAspectRatio', 'xMidYMid slice')
 
+        // Flag background
         cg.append('path')
           .datum(feature).attr('d', pathGen)
           .attr('fill', `url(#${flagId})`)
@@ -207,97 +170,44 @@ export default function WorldMap({ onCountryClick, onCountryHover, onPixelDouble
           .attr('stroke', 'none')
           .attr('pointer-events', 'none')
 
-        defs.append('clipPath').attr('id', clipId)
-          .append('path').datum(feature).attr('d', pathGen)
+        // Intensity overlay — fill-opacity updated based on pixel count
+        const overlayPath = cg.append('path')
+          .datum(feature).attr('d', pathGen)
+          .attr('fill', '#E8C84A')
+          .attr('fill-opacity', 0)
+          .attr('stroke', 'none')
+          .attr('pointer-events', 'none')
 
-        const cellsGroup = cg.append('g').attr('clip-path', `url(#${clipId})`)
-        if (!cellsGroupsRef.current[country.iso]) cellsGroupsRef.current[country.iso] = []
-        cellsGroupsRef.current[country.iso].push(cellsGroup)
+        if (!overlayPathsRef.current[country.iso]) overlayPathsRef.current[country.iso] = []
+        overlayPathsRef.current[country.iso].push(overlayPath)
 
-        cellsGroup.selectAll('rect')
-          .data(cells, d => d.id)
-          .join('rect')
-          .attr('x', d => d.x).attr('y', d => d.y)
-          .attr('width', CELL).attr('height', CELL)
-          .attr('fill', 'transparent').attr('fill-opacity', 0)
-          .attr('stroke', '#1a2a4a').attr('stroke-width', 0.5)
-
-        const { iso } = country
-        cellsGroup
-          .on('mouseover', function(event) {
-            if (event.target.tagName !== 'rect') return
-            const d = event.target.__data__
-            if (!d) return
-            callbacksRef.current.onCountryHover?.(country)
-            svg.style('cursor', 'pointer')
-            const store     = useMapStore.getState()
-            const occupied  = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
-            const confirmed = store.confirmedPixels.has(`${iso}:${d.id}`)
-            const pending   = store.pendingPixels.has(`${iso}:${d.id}`)
-            if (occupied || confirmed) {
-              const px = pixelsMaps.current[iso]?.get(d.id)
-              d3.select(event.target).attr('fill', px?.color ?? '#FFE085').attr('fill-opacity', 1)
-              setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: 'ÉCOUTER — DOUBLE-CLIC POUR DÉTAILS' })
-            } else if (pending) {
-              d3.select(event.target).attr('fill', '#FFE085').attr('fill-opacity', 0.8)
-              setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: 'SÉLECTIONNÉ — CLIQUER POUR RETIRER' })
-            } else {
-              d3.select(event.target).attr('fill', '#E8C84A').attr('fill-opacity', 0.3)
-              setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: 'PLACER MA VOIX' })
-            }
-          })
-          .on('mouseout', function(event) {
-            if (event.target.tagName !== 'rect') return
-            const d = event.target.__data__
-            if (!d) return
-            setTooltip(null)
-            svg.style('cursor', 'grab')
-            const store     = useMapStore.getState()
-            const occupied  = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
-            const confirmed = store.confirmedPixels.has(`${iso}:${d.id}`)
-            const pending   = store.pendingPixels.has(`${iso}:${d.id}`)
-            const px = pixelsMaps.current[iso]?.get(d.id)
-            d3.select(event.target)
-              .attr('fill',         occupied || confirmed ? (px?.color ?? '#E8C84A') : pending ? '#E8C84A' : 'transparent')
-              .attr('fill-opacity', occupied || confirmed ? 0.9 : pending ? 0.5 : 0)
-          })
-          .on('click', function(event) {
-            if (event.target.tagName !== 'rect') return
-            const d = event.target.__data__
-            if (!d) return
-            const store     = useMapStore.getState()
-            const occupied  = (occupiedMaps.current[iso] ?? new Set()).has(d.id)
-            const confirmed = store.confirmedPixels.has(`${iso}:${d.id}`)
-            if (occupied || confirmed) {
-              const key = `${iso}:${d.id}`
-              if (clickTimerRef.current && lastClickRef.current === key) {
-                // Double-click → open modal
-                clearTimeout(clickTimerRef.current)
-                clickTimerRef.current = null
-                lastClickRef.current  = null
-                const pixel = pixelsMaps.current[iso]?.get(d.id)
-                if (pixel) callbacksRef.current.onPixelDoubleClick?.({ iso, pixel })
-              } else {
-                // First click — wait 240ms to confirm it's not a double-click
-                lastClickRef.current = key
-                clickTimerRef.current = setTimeout(() => {
-                  clickTimerRef.current = null
-                  lastClickRef.current  = null
-                  const dbId = pixelsMaps.current[iso]?.get(d.id)?.id
-                  useMapStore.getState().setClickedPixel(iso, dbId ?? d.id)
-                }, 240)
-              }
-            } else {
-              store.togglePendingPixel(iso, d.id)
-              callbacksRef.current.onCountryClick?.(country)
-            }
-          })
-
+        // Country border
         cg.append('path').datum(feature).attr('d', pathGen)
           .attr('fill', 'none')
           .style('stroke', 'var(--border-country)')
           .attr('stroke-width', 0.5)
           .attr('pointer-events', 'none')
+
+        // Transparent hit area for click/hover
+        cg.append('path').datum(feature).attr('d', pathGen)
+          .attr('fill', 'transparent')
+          .attr('stroke', 'none')
+          .style('cursor', 'pointer')
+          .on('mouseover', function(event) {
+            callbacksRef.current.onCountryHover?.(country)
+            svg.style('cursor', 'pointer')
+            setTooltip({ x: event.clientX + 14, y: event.clientY - 10, message: 'VOIR LES PIXELS' })
+          })
+          .on('mousemove', function(event) {
+            setTooltip(t => t ? { ...t, x: event.clientX + 14, y: event.clientY - 10 } : null)
+          })
+          .on('mouseout', function() {
+            setTooltip(null)
+            svg.style('cursor', 'grab')
+          })
+          .on('click', function() {
+            callbacksRef.current.onCountryClick?.(country)
+          })
       })
     })
 
@@ -308,10 +218,8 @@ export default function WorldMap({ onCountryClick, onCountryHover, onPixelDouble
       .on('zoom', function(event) {
         const t = event.transform
         const screenTileW = tileW * t.k
-
         const normTx = ((t.x % screenTileW) + screenTileW) % screenTileW
         const normTy = Math.min(0, Math.max(height * (1 - t.k), t.y))
-
         const nt = d3.zoomIdentity.translate(normTx, normTy).scale(t.k)
         g.attr('transform', nt)
         svg.property('__zoom', nt)
@@ -326,66 +234,16 @@ export default function WorldMap({ onCountryClick, onCountryHover, onPixelDouble
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  // ─── Sync purchased + pending + playing pixels across all 3 tile copies ──
+  // ─── Sync pixel count → overlay intensity ─────────────────────────────────
   useEffect(() => {
-    const { cellsByCountry } = useMapStore.getState()
-    const proj = projectionRef.current
     QUALIFIED.forEach(({ iso }) => {
-      const pixels = pixelsByCountry[iso] ?? []
-      const cells  = cellsByCountry[iso]  ?? []
-
-      const occupiedCellIds = new Set()
-      const cellIdToPixel   = new Map()
-
-      // Project each DB pixel's geographic coords to screen space and find its cell.
-      // Exact float comparison fails across different window sizes; spatial lookup is robust.
-      if (proj) {
-        for (const pixel of pixels) {
-          const [sx, sy] = proj([pixel.lng, pixel.lat])
-          const cell = cells.find(c => sx >= c.x && sx < c.x + CELL && sy >= c.y && sy < c.y + CELL)
-          if (cell) {
-            occupiedCellIds.add(cell.id)
-            cellIdToPixel.set(cell.id, pixel)
-          }
-        }
-      }
-      occupiedMaps.current[iso] = occupiedCellIds
-      pixelsMaps.current[iso]   = cellIdToPixel
-
-      const groups = cellsGroupsRef.current[iso] ?? []
-      groups.forEach(group => {
-        group.selectAll('rect')
-          .attr('fill', d => {
-            if (occupiedCellIds.has(d.id)) return cellIdToPixel.get(d.id)?.color ?? '#E8C84A'
-            if (confirmedPixels.has(`${iso}:${d.id}`))  return '#E8C84A'
-            if (pendingPixels.has(`${iso}:${d.id}`))    return '#E8C84A'
-            return 'transparent'
-          })
-          .attr('fill-opacity', d => {
-            if (occupiedCellIds.has(d.id))               return 0.9
-            if (confirmedPixels.has(`${iso}:${d.id}`))  return 0.9
-            if (pendingPixels.has(`${iso}:${d.id}`))    return 0.5
-            return 0
-          })
-          .attr('stroke', d => {
-            const px = cellIdToPixel.get(d.id)
-            if (px && playingPixels.has(`${iso}:${px.id}`)) return '#ffffff'
-            if (occupiedCellIds.has(d.id)) return px?.color ?? '#E8C84A'
-            if (confirmedPixels.has(`${iso}:${d.id}`))  return '#E8C84A'
-            if (pendingPixels.has(`${iso}:${d.id}`))    return '#E8C84A'
-            return '#1a2a4a'
-          })
-          .attr('stroke-width', d => {
-            const px = cellIdToPixel.get(d.id)
-            return px && playingPixels.has(`${iso}:${px.id}`) ? 1.5 : 0.5
-          })
-          .classed('pixel-playing', d => {
-            const px = cellIdToPixel.get(d.id)
-            return !!(px && playingPixels.has(`${iso}:${px.id}`))
-          })
+      const count   = (pixelsByCountry[iso] ?? []).length
+      const opacity = Math.min(0.65, count / 40000 * 0.65)
+      ;(overlayPathsRef.current[iso] ?? []).forEach(path => {
+        path.attr('fill-opacity', opacity)
       })
     })
-  }, [pixelsByCountry, playingPixels, pendingPixels, confirmedPixels])
+  }, [pixelsByCountry])
 
   // ─── Scale France from its centroid ───────────────────────────────────────
   useEffect(() => {
@@ -398,36 +256,12 @@ export default function WorldMap({ onCountryClick, onCountryHover, onPixelDouble
     })
   }, [frScale])
 
-  const pendingCount = pendingPixels.size
-
   return (
     <div
       ref={containerRef}
       style={{ position: 'relative', backgroundColor: 'var(--bg)', width: '100vw', height: '100vh', overflow: 'clip' }}
     >
       <svg ref={svgRef} style={{ display: 'block' }} />
-
-      {/* Floating selection counter */}
-      {pendingCount > 0 && (
-        <div style={{
-          position: 'absolute',
-          bottom: 92,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'rgba(5,8,15,0.92)',
-          border: '1px solid #E8C84A',
-          color: '#E8C84A',
-          fontFamily: BEBAS,
-          fontSize: 16,
-          letterSpacing: 2,
-          padding: '9px 22px',
-          pointerEvents: 'none',
-          zIndex: 500,
-          whiteSpace: 'nowrap',
-        }}>
-          {pendingCount} PIXEL{pendingCount > 1 ? 'S' : ''} SÉLECTIONNÉ{pendingCount > 1 ? 'S' : ''} = {pendingCount}€
-        </div>
-      )}
 
       {tooltip && (
         <div style={{

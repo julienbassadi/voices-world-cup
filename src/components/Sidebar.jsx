@@ -28,10 +28,12 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
   const audioPlayerRef   = useRef(null)
   const timerRef         = useRef(null)
 
-  const pixelsByCountry = useMapStore(s => s.pixelsByCountry)
-  const pendingPixels   = useMapStore(s => s.pendingPixels)
-  const currentPixels   = (pixelsByCountry[country?.iso] ?? []).length
-  const pendingCount    = pendingPixels.size
+  const pixelsByCountry   = useMapStore(s => s.pixelsByCountry)
+  const pendingGridPixels = useMapStore(s => s.pendingGridPixels)
+  const currentPixels     = (pixelsByCountry[country?.iso] ?? []).length
+  const prefix            = `${country?.iso}:`
+  let pendingCount        = 0
+  for (const k of pendingGridPixels) { if (k.startsWith(prefix)) pendingCount++ }
   const isLoggedIn      = useAuthStore(s => s.isLoggedIn)
   const user            = useAuthStore(s => s.user)
 
@@ -57,8 +59,7 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
     setPseudo('')
     setDescription('')
     setSelectedColor('#E8C84A')
-    // confirmedPixels intentionally NOT cleared here — they must stay visible
-    // on the map after purchase even when the sidebar closes
+    // Grid pixels cleared separately; confirmed stays visible on map after purchase
   }, [country?.iso])
 
   // Cleanup on unmount
@@ -236,7 +237,7 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
 
       // ── 2. Insertion pixels ──────────────────────────────────────────────
       console.log('Insertion pixels...')
-      await useMapStore.getState().commitPendingPixels({
+      await useMapStore.getState().commitGridPendingPixels({
         audioUrl: publicUrl,
         pseudo: pseudo.trim() || null,
         description: description.trim() || null,
@@ -376,10 +377,9 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
                   <span style={{ fontSize: 22, fontFamily: BEBAS, display: 'block', letterSpacing: 2, marginBottom: 2 }}>
                     {pendingCount} PIXEL{pendingCount > 1 ? 'S' : ''} SÉLECTIONNÉ{pendingCount > 1 ? 'S' : ''}
                   </span>
-                  Cliquez sur d'autres pixels pour en ajouter,<br />
-                  ou sur un pixel doré pour le retirer.
+                  Cliquez sur « Enregistrer » pour associer votre voix.
                 </>
-              : 'Cliquez sur les pixels vides de la carte\npour les sélectionner.'
+              : 'Retournez sur la carte et sélectionnez des pixels.'
             }
           </div>
         )}

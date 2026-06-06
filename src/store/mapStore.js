@@ -6,6 +6,8 @@ const mapPixel = p => ({
   id: p.id,
   lat: p.x,
   lng: p.y,
+  gridX: p.grid_x ?? null,
+  gridY: p.grid_y ?? null,
   userId: p.user_id,
   audioUrl: p.audio_url,
   pseudo: p.pseudo ?? null,
@@ -43,6 +45,66 @@ const useMapStore = create((set, get) => ({
     }),
 
   clearPendingPixels: () => set({ pendingPixels: new Set() }),
+
+  // ── Grid pixels — modal 200×200 selection ─────────────────────────────────
+  pendingGridPixels: new Set(),
+
+  toggleGridPixel: (iso, gx, gy) =>
+    set(state => {
+      const key  = `${iso}:${gx}:${gy}`
+      const next = new Set(state.pendingGridPixels)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return { pendingGridPixels: next }
+    }),
+
+  clearGridPendingPixels: () => set({ pendingGridPixels: new Set() }),
+
+  commitGridPendingPixels: async ({ audioUrl, pseudo, description, color } = {}) => {
+    const { pendingGridPixels } = get()
+    const userId = useAuthStore.getState().user?.id
+
+    const rows = []
+    for (const key of pendingGridPixels) {
+      const parts    = key.split(':')
+      const iso      = parts[0]
+      const gx       = parseInt(parts[1])
+      const gy       = parseInt(parts[2])
+      rows.push({
+        user_id:     userId,
+        country_iso: iso,
+        grid_x:      gx,
+        grid_y:      gy,
+        audio_url:   audioUrl  ?? null,
+        pseudo:      pseudo    ?? null,
+        description: description ?? null,
+        color:       color     ?? null,
+      })
+    }
+
+    if (rows.length === 0) throw new Error('Aucun pixel sélectionné.')
+
+    const { data, error } = await supabase.from('pixels').insert(rows).select()
+    if (error) throw new Error(`Insertion pixels échouée : ${error.message}`)
+
+    const byCountry = {}
+    for (const p of data) {
+      if (!byCountry[p.country_iso]) byCountry[p.country_iso] = []
+      byCountry[p.country_iso].push(mapPixel(p))
+    }
+
+    set(state => {
+      const newPbc = { ...state.pixelsByCountry }
+      for (const [iso, pixels] of Object.entries(byCountry)) {
+        newPbc[iso] = [...(newPbc[iso] ?? []), ...pixels]
+      }
+      return {
+        pendingGridPixels: new Set(),
+        totalVoices:       state.totalVoices + data.length,
+        pixelsByCountry:   newPbc,
+      }
+    })
+  },
 
   // ── Confirmed pixels — committed to DB, stays visible at full opacity ─────
   confirmedPixels: new Set(),

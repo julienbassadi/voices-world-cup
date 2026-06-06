@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import WorldMap, { QUALIFIED } from './components/WorldMap'
 import Sidebar from './components/Sidebar'
+import CountryModal from './components/CountryModal'
 import HUD from './components/HUD'
 import AudioLayer from './components/AudioLayer'
 import Auth from './components/Auth'
@@ -8,11 +9,12 @@ import VocalSpace from './components/VocalSpace'
 import useMapStore from './store/mapStore'
 
 export default function App() {
-  const [selectedCountry, setSelectedCountry]     = useState(null)
+  const [countryModal, setCountryModal]         = useState(null) // country → opens pixel grid modal
+  const [selectedCountry, setSelectedCountry]   = useState(null) // country → opens recording sidebar
   const [lastHoveredCountry, setLastHoveredCountry] = useState(null)
-  const [showAuth, setShowAuth]                   = useState(false)
-  const [pixelView, setPixelView]                 = useState(null) // { country, pixel }
-  const authCallbackRef                           = useRef(null)
+  const [showAuth, setShowAuth]                 = useState(false)
+  const [pixelView, setPixelView]               = useState(null) // { country, pixel }
+  const authCallbackRef                         = useRef(null)
 
   useEffect(() => {
     useMapStore.getState().loadPixels()
@@ -21,27 +23,42 @@ export default function App() {
 
   const handleCountryClick = useCallback(country => {
     setPixelView(null)
-    setSelectedCountry(country)
+    setSelectedCountry(null)
+    setCountryModal(country)
   }, [])
 
   const handleCountryHover = useCallback(country => setLastHoveredCountry(country), [])
 
+  // "ACHETER" button in CountryModal → close modal, open recording sidebar
+  const handleModalBuy = useCallback(country => {
+    setCountryModal(null)
+    setSelectedCountry(country)
+  }, [])
+
+  const handleModalClose = useCallback(() => {
+    setCountryModal(null)
+    useMapStore.getState().clearGridPendingPixels()
+  }, [])
+
+  // Double-click on purchased pixel in CountryModal → open VocalSpace
   const handlePixelDoubleClick = useCallback(({ iso, pixel }) => {
     const country = QUALIFIED.find(c => c.iso === iso)
     if (!country || !pixel) return
+    setCountryModal(null)
     setSelectedCountry(null)
-    useMapStore.getState().clearPendingPixels()
+    useMapStore.getState().clearGridPendingPixels()
     setPixelView({ country, pixel })
   }, [])
 
   const handleCloseSidebar = useCallback(() => {
     setSelectedCountry(null)
     setPixelView(null)
-    useMapStore.getState().clearPendingPixels()
+    useMapStore.getState().clearGridPendingPixels()
   }, [])
 
+  // HUD bottom button — open pixel grid modal for last hovered country
   const handleOpenSidebar = useCallback(
-    () => setSelectedCountry(lastHoveredCountry),
+    () => setCountryModal(lastHoveredCountry),
     [lastHoveredCountry]
   )
 
@@ -67,7 +84,6 @@ export default function App() {
       <WorldMap
         onCountryClick={handleCountryClick}
         onCountryHover={handleCountryHover}
-        onPixelDoubleClick={handlePixelDoubleClick}
       />
       <HUD
         lastHoveredCountry={lastHoveredCountry}
@@ -84,6 +100,15 @@ export default function App() {
           country={selectedCountry}
           onClose={handleCloseSidebar}
           onNeedAuth={handleNeedAuth}
+        />
+      )}
+      {countryModal && (
+        <CountryModal
+          country={countryModal}
+          onClose={handleModalClose}
+          onBuy={handleModalBuy}
+          onNeedAuth={handleNeedAuth}
+          onPixelDoubleClick={handlePixelDoubleClick}
         />
       )}
       <AudioLayer />
