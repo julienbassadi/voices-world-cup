@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.107.0",
     "d3": "^7.9.0",
     "flag-icons": "^7.5.0",
+    "html2canvas": "^1.4.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "topojson-client": "^3.1.0",
