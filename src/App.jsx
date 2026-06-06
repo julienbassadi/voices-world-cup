@@ -13,6 +13,7 @@ export default function App() {
   const [selectedCountry, setSelectedCountry]   = useState(null) // country → recording sidebar
   const [lastHoveredCountry, setLastHoveredCountry] = useState(null)
   const [showAuth, setShowAuth]                 = useState(false)
+  const [showAuthTab, setShowAuthTab]           = useState('login')
   const [pixelView, setPixelView]               = useState(null) // { country, pixel }
   const authCallbackRef                         = useRef(null)
 
@@ -73,6 +74,14 @@ export default function App() {
 
   const handleNeedAuth = useCallback((cb) => {
     authCallbackRef.current = cb
+    setShowAuthTab('login')
+    setShowAuth(true)
+  }, [])
+
+  // Direct open from MyPixels buttons (no post-auth callback needed)
+  const handleOpenAuth = useCallback((tab = 'login') => {
+    authCallbackRef.current = null
+    setShowAuthTab(tab)
     setShowAuth(true)
   }, [])
 
@@ -98,6 +107,7 @@ export default function App() {
         lastHoveredCountry={lastHoveredCountry}
         onOpenSidebar={handleOpenSidebar}
         onOpenVocalSpace={handleHUDOpenVocalSpace}
+        onOpenAuth={handleOpenAuth}
       />
 
       {/* VocalSpace overlays everything */}
@@ -135,6 +145,7 @@ export default function App() {
 
       {showAuth && (
         <Auth
+          initialTab={showAuthTab}
           onClose={handleAuthClose}
           onSuccess={handleAuthSuccess}
         />

@@ -9,7 +9,7 @@ const MONO  = "'DM Mono', monospace"
 
 const SHARE_BASE = 'https://voicesworldcup.vercel.app'
 
-export default function MyPixels({ onOpenVocalSpace, isDark }) {
+export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth }) {
   const [isOpen, setIsOpen]               = useState(false)
   const [commentCounts, setCommentCounts] = useState({})
   const [toastMsg, setToastMsg]           = useState(null)
@@ -17,6 +17,7 @@ export default function MyPixels({ onOpenVocalSpace, isDark }) {
 
   const user            = useAuthStore(s => s.user)
   const isLoggedIn      = useAuthStore(s => s.isLoggedIn)
+  const logout          = useAuthStore(s => s.logout)
   const pixelsByCountry = useMapStore(s => s.pixelsByCountry)
 
   // Derive the current user's pixels from the global store (stays in sync with realtime)
@@ -136,12 +137,35 @@ export default function MyPixels({ onOpenVocalSpace, isDark }) {
           backdropFilter: 'blur(8px)',
         }}>
           {!isLoggedIn ? (
-            <div style={{
-              padding: '16px 12px',
-              fontFamily: MONO, fontSize: 10, color: mutedColor,
-              textAlign: 'center', letterSpacing: 0.5, lineHeight: 1.7,
-            }}>
-              Connectez-vous pour<br />retrouver vos pixels
+            <div style={{ padding: '10px 10px', display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => onOpenAuth?.('register')}
+                style={{
+                  flex: 1,
+                  background: isDark
+                    ? 'linear-gradient(135deg, #E8C84A, #c9a830)'
+                    : 'linear-gradient(135deg, #1a3080, #2a45b0)',
+                  border: 'none',
+                  color: isDark ? '#05080F' : '#ffffff',
+                  fontFamily: BEBAS, fontSize: 11, letterSpacing: 2,
+                  padding: '8px 0', cursor: 'pointer', borderRadius: 2,
+                }}
+              >
+                S'INSCRIRE
+              </button>
+              <button
+                onClick={() => onOpenAuth?.('login')}
+                style={{
+                  flex: 1,
+                  background: 'none',
+                  border: `1px solid ${isDark ? 'rgba(232,200,74,0.30)' : 'rgba(26,48,128,0.25)'}`,
+                  color: isDark ? 'rgba(232,200,74,0.75)' : '#1a3080',
+                  fontFamily: BEBAS, fontSize: 11, letterSpacing: 2,
+                  padding: '8px 0', cursor: 'pointer', borderRadius: 2,
+                }}
+              >
+                SE CONNECTER
+              </button>
             </div>
           ) : userPixels.length === 0 ? (
             <div style={{
@@ -196,6 +220,25 @@ export default function MyPixels({ onOpenVocalSpace, isDark }) {
               </div>
             )
           })}
+          {/* Logout button — only shown when logged in */}
+          {isLoggedIn && (
+            <div style={{ padding: '8px 10px', borderTop: `1px solid ${dividerClr}` }}>
+              <button
+                onClick={() => logout()}
+                style={{
+                  width: '100%',
+                  background: 'none',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(26,48,128,0.14)'}`,
+                  color: mutedColor,
+                  fontFamily: BEBAS, fontSize: 10, letterSpacing: 2,
+                  padding: '6px 0', cursor: 'pointer', borderRadius: 2,
+                  transition: 'opacity 0.15s',
+                }}
+              >
+                SE DÉCONNECTER
+              </button>
+            </div>
+          )}
         </div>
       )}
 

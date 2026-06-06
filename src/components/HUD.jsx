@@ -27,7 +27,7 @@ function useCountdown() {
 
 const fmtVoix = n => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 
-export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpace }) {
+export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpace, onOpenAuth }) {
   const { jj, hh, mm, ss } = useCountdown()
 
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') ?? 'dark')
@@ -198,7 +198,7 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
         width: 272,
         pointerEvents: 'auto',
       }}>
-        <MyPixels onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} />
+        <MyPixels onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} />
       </div>
 
       {/* ── Bottom: hexagonal CTA ── */}

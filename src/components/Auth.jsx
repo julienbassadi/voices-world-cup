@@ -58,8 +58,8 @@ const mkPrimaryBtn = (isLight, disabled) => ({
 })
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function Auth({ onClose, onSuccess }) {
-  const [tab, setTab]             = useState('login')
+export default function Auth({ onClose, onSuccess, initialTab = 'login' }) {
+  const [tab, setTab]             = useState(initialTab)
   const [email, setEmail]         = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName]   = useState('')
