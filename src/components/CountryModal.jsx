@@ -2,22 +2,46 @@ import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import useMapStore from '../store/mapStore'
 import useAuthStore from '../store/authStore'
 
-const BEBAS = "'Bebas Neue', Impact, sans-serif"
-const MONO  = "'DM Mono', monospace"
-const GRID_SIZE = 200
-const CELL_SIZE = 3
+const BEBAS       = "'Bebas Neue', Impact, sans-serif"
+const MONO        = "'DM Mono', monospace"
+const GRID_SIZE   = 200
+const CELL_SIZE   = 3
+const CANVAS_SIZE = GRID_SIZE * CELL_SIZE  // 600px
 
-export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPixelDoubleClick }) {
-  const canvasRef     = useRef(null)
-  const clickTimerRef = useRef(null)
-  const lastClickRef  = useRef(null)
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
+const clampOffset = (offset, scale) => clamp(offset, CANVAS_SIZE * (1 - scale), 0)
+
+export default function CountryModal({
+  country,
+  sidebarOpen,
+  onClose,
+  onBuy,
+  onNeedAuth,
+  onPixelDoubleClick,
+}) {
+  const canvasRef       = useRef(null)
+  const clickTimerRef   = useRef(null)
+  const lastClickRef    = useRef(null)
+  const mouseDownRef    = useRef(null) // { clientX, clientY } — for drag/click distinction
+  const dragRef         = useRef(null) // { startClientX, startClientY, startOffsetX, startOffsetY }
 
   const [hoveredCell, setHoveredCell] = useState(null)
   const [tooltip, setTooltip]         = useState(null)
+  const [isDragging, setIsDragging]   = useState(false)
   const [isLight, setIsLight]         = useState(
     () => document.documentElement.getAttribute('data-theme') === 'light'
   )
 
+  // ── Transform: { scale: 1..8, offsetX, offsetY } in canvas logical px ────
+  const [transform, setTransform] = useState({ scale: 1, offsetX: 0, offsetY: 0 })
+  const transformRef = useRef({ scale: 1, offsetX: 0, offsetY: 0 })
+
+  const applyTransform = useCallback((t) => {
+    transformRef.current = t
+    setTransform(t)
+  }, [])
+
+  // ── Store ─────────────────────────────────────────────────────────────────
   const pixelsByCountry   = useMapStore(s => s.pixelsByCountry)
   const pendingGridPixels = useMapStore(s => s.pendingGridPixels)
   const isLoggedIn        = useAuthStore(s => s.isLoggedIn)
@@ -25,13 +49,11 @@ export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPi
   const countryPixels = pixelsByCountry[country?.iso] ?? []
   const pixelCount    = countryPixels.length
 
-  // Map "gx:gy" → pixel for O(1) lookup
   const pixelMap = useMemo(() => {
     const map = new Map()
     for (const px of countryPixels) {
-      if (px.gridX != null && px.gridY != null) {
+      if (px.gridX != null && px.gridY != null)
         map.set(`${px.gridX}:${px.gridY}`, px)
-      }
     }
     return map
   }, [countryPixels])
@@ -39,11 +61,11 @@ export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPi
   const pendingCount = useMemo(() => {
     const prefix = `${country?.iso}:`
     let n = 0
-    for (const key of pendingGridPixels) { if (key.startsWith(prefix)) n++ }
+    for (const k of pendingGridPixels) { if (k.startsWith(prefix)) n++ }
     return n
   }, [pendingGridPixels, country?.iso])
 
-  // Theme sync
+  // ── Theme sync ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const obs = new MutationObserver(() =>
       setIsLight(document.documentElement.getAttribute('data-theme') === 'light')
@@ -52,17 +74,28 @@ export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPi
     return () => obs.disconnect()
   }, [])
 
-  // Canvas draw — runs whenever pixel state or hover changes
+  // ── Canvas draw ───────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !country) return
     const ctx = canvas.getContext('2d')
+    const { scale, offsetX, offsetY } = transform
 
     ctx.fillStyle = '#0a0f1e'
-    ctx.fillRect(0, 0, GRID_SIZE * CELL_SIZE, GRID_SIZE * CELL_SIZE)
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
 
-    for (let gy = 0; gy < GRID_SIZE; gy++) {
-      for (let gx = 0; gx < GRID_SIZE; gx++) {
+    // Visible cell range (culling)
+    const x0 = Math.max(0, Math.floor(-offsetX / scale / CELL_SIZE) - 1)
+    const y0 = Math.max(0, Math.floor(-offsetY / scale / CELL_SIZE) - 1)
+    const x1 = Math.min(GRID_SIZE - 1, Math.ceil((-offsetX + CANVAS_SIZE) / scale / CELL_SIZE))
+    const y1 = Math.min(GRID_SIZE - 1, Math.ceil((-offsetY + CANVAS_SIZE) / scale / CELL_SIZE))
+
+    ctx.save()
+    ctx.translate(offsetX, offsetY)
+    ctx.scale(scale, scale)
+
+    for (let gy = y0; gy <= y1; gy++) {
+      for (let gx = x0; gx <= x1; gx++) {
         const px        = pixelMap.get(`${gx}:${gy}`)
         const isPending = pendingGridPixels.has(`${country.iso}:${gx}:${gy}`)
         const isHovered = hoveredCell?.gx === gx && hoveredCell?.gy === gy
@@ -76,7 +109,7 @@ export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPi
           ctx.fillRect(cx, cy, sz, sz)
           if (isHovered) {
             ctx.strokeStyle = '#ffffff'
-            ctx.lineWidth   = 0.5
+            ctx.lineWidth   = 0.5 / scale
             ctx.globalAlpha = 0.8
             ctx.strokeRect(cx + 0.25, cy + 0.25, sz - 0.5, sz - 0.5)
             ctx.globalAlpha = 1
@@ -98,48 +131,116 @@ export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPi
         }
       }
     }
-  }, [pixelMap, pendingGridPixels, hoveredCell, country])
 
-  // Compute which grid cell is under the mouse
-  const getCellFromEvent = useCallback((e) => {
+    ctx.restore()
+  }, [pixelMap, pendingGridPixels, hoveredCell, country, transform])
+
+  // ── Wheel zoom (non-passive for preventDefault) ────────────────────────────
+  useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas) return null
-    const rect   = canvas.getBoundingClientRect()
-    const scaleX = (GRID_SIZE * CELL_SIZE) / rect.width
-    const scaleY = (GRID_SIZE * CELL_SIZE) / rect.height
-    const gx = Math.floor((e.clientX - rect.left) * scaleX / CELL_SIZE)
-    const gy = Math.floor((e.clientY - rect.top)  * scaleY / CELL_SIZE)
+    if (!canvas) return
+    const onWheel = (e) => {
+      e.preventDefault()
+      const rect   = canvas.getBoundingClientRect()
+      const cX     = (e.clientX - rect.left) * (CANVAS_SIZE / rect.width)
+      const cY     = (e.clientY - rect.top)  * (CANVAS_SIZE / rect.height)
+      const { scale, offsetX, offsetY } = transformRef.current
+      const factor = e.deltaY < 0 ? 1.25 : 0.8
+      const ns     = clamp(scale * factor, 1, 8)
+      applyTransform({
+        scale:   ns,
+        offsetX: clampOffset(cX - (cX - offsetX) * (ns / scale), ns),
+        offsetY: clampOffset(cY - (cY - offsetY) * (ns / scale), ns),
+      })
+    }
+    canvas.addEventListener('wheel', onWheel, { passive: false })
+    return () => canvas.removeEventListener('wheel', onWheel)
+  }, [applyTransform])
+
+  // ── Coordinate helpers (only use refs — always stable) ────────────────────
+  const toCanvasPos = useCallback((e) => {
+    const rect = canvasRef.current.getBoundingClientRect()
+    return {
+      x: (e.clientX - rect.left) * (CANVAS_SIZE / rect.width),
+      y: (e.clientY - rect.top)  * (CANVAS_SIZE / rect.height),
+    }
+  }, [])
+
+  const toCellCoords = useCallback((canvasX, canvasY) => {
+    const { scale, offsetX, offsetY } = transformRef.current
+    const gx = Math.floor((canvasX - offsetX) / scale / CELL_SIZE)
+    const gy = Math.floor((canvasY - offsetY) / scale / CELL_SIZE)
     if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return null
     return { gx, gy }
   }, [])
 
+  // ── Mouse handlers ────────────────────────────────────────────────────────
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return
+    mouseDownRef.current = { clientX: e.clientX, clientY: e.clientY }
+    if (transformRef.current.scale > 1) {
+      dragRef.current = {
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startOffsetX: transformRef.current.offsetX,
+        startOffsetY: transformRef.current.offsetY,
+      }
+      setIsDragging(true)
+    }
+  }, [])
+
   const handleMouseMove = useCallback((e) => {
-    const cell = getCellFromEvent(e)
+    if (dragRef.current) {
+      const rect  = canvasRef.current.getBoundingClientRect()
+      const ratio = CANVAS_SIZE / rect.width
+      const { startClientX, startClientY, startOffsetX, startOffsetY } = dragRef.current
+      const { scale } = transformRef.current
+      applyTransform({
+        scale,
+        offsetX: clampOffset(startOffsetX + (e.clientX - startClientX) * ratio, scale),
+        offsetY: clampOffset(startOffsetY + (e.clientY - startClientY) * ratio, scale),
+      })
+      return
+    }
+    const { x, y } = toCanvasPos(e)
+    const cell     = toCellCoords(x, y)
     setHoveredCell(cell)
     if (!cell) { setTooltip(null); return }
     const px        = pixelMap.get(`${cell.gx}:${cell.gy}`)
     const isPending = pendingGridPixels.has(`${country.iso}:${cell.gx}:${cell.gy}`)
-    const msg = px
-      ? 'ÉCOUTER — DOUBLE-CLIC POUR DÉTAILS'
-      : isPending
-        ? 'SÉLECTIONNÉ — CLIQUER POUR RETIRER'
-        : 'PLACER MA VOIX'
-    setTooltip({ x: e.clientX + 14, y: e.clientY - 10, message: msg })
-  }, [getCellFromEvent, pixelMap, pendingGridPixels, country?.iso])
+    setTooltip({
+      x: e.clientX + 14, y: e.clientY - 10,
+      message: px
+        ? 'ÉCOUTER — DOUBLE-CLIC POUR DÉTAILS'
+        : isPending
+          ? 'SÉLECTIONNÉ — CLIQUER POUR RETIRER'
+          : 'PLACER MA VOIX',
+    })
+  }, [toCanvasPos, toCellCoords, pixelMap, pendingGridPixels, country?.iso, applyTransform])
 
-  const handleMouseLeave = useCallback(() => {
-    setHoveredCell(null)
-    setTooltip(null)
+  const endDrag = useCallback(() => {
+    dragRef.current = null
+    setIsDragging(false)
   }, [])
 
+  const handleMouseLeave = useCallback(() => {
+    endDrag()
+    setHoveredCell(null)
+    setTooltip(null)
+  }, [endDrag])
+
   const handleClick = useCallback((e) => {
-    const cell = getCellFromEvent(e)
+    // Ignore if mouse moved significantly (was a drag)
+    const down = mouseDownRef.current
+    if (down && (Math.abs(e.clientX - down.clientX) > 4 || Math.abs(e.clientY - down.clientY) > 4)) return
+
+    const { x, y } = toCanvasPos(e)
+    const cell      = toCellCoords(x, y)
     if (!cell) return
     const { gx, gy } = cell
     const px = pixelMap.get(`${gx}:${gy}`)
 
     if (px) {
-      // Single click → play audio; double click → open VocalSpace
       const key = `${country.iso}:${gx}:${gy}`
       if (clickTimerRef.current && lastClickRef.current === key) {
         clearTimeout(clickTimerRef.current)
@@ -157,8 +258,22 @@ export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPi
     } else {
       useMapStore.getState().toggleGridPixel(country.iso, gx, gy)
     }
-  }, [getCellFromEvent, pixelMap, country?.iso, onPixelDoubleClick])
+  }, [toCanvasPos, toCellCoords, pixelMap, country?.iso, onPixelDoubleClick])
 
+  // ── Zoom buttons ──────────────────────────────────────────────────────────
+  const zoomBy = useCallback((factor) => {
+    const { scale, offsetX, offsetY } = transformRef.current
+    const ns = clamp(scale * factor, 1, 8)
+    const cx = CANVAS_SIZE / 2
+    const cy = CANVAS_SIZE / 2
+    applyTransform({
+      scale:   ns,
+      offsetX: clampOffset(cx - (cx - offsetX) * (ns / scale), ns),
+      offsetY: clampOffset(cy - (cy - offsetY) * (ns / scale), ns),
+    })
+  }, [applyTransform])
+
+  // ── Buy ───────────────────────────────────────────────────────────────────
   const handleBuyClick = useCallback(() => {
     if (pendingCount === 0) return
     if (!isLoggedIn) {
@@ -172,7 +287,6 @@ export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPi
     if (e.target === e.currentTarget) onClose?.()
   }, [onClose])
 
-  // Cleanup click timer on unmount
   useEffect(() => () => clearTimeout(clickTimerRef.current), [])
 
   if (!country) return null
@@ -182,14 +296,33 @@ export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPi
   const mutedColor = isLight ? 'rgba(26,48,128,0.6)' : 'rgba(255,255,255,0.45)'
   const dividerClr = isLight ? 'rgba(26,48,128,0.12)' : 'rgba(232,200,74,0.12)'
 
+  const canvasCursor = isDragging ? 'grabbing' : transform.scale > 1 ? 'grab' : 'crosshair'
+
+  const zBtnBase = {
+    width: 26, height: 26,
+    background: isLight ? 'rgba(26,48,128,0.1)' : 'rgba(5,8,15,0.8)',
+    border:     `1px solid ${accent}`,
+    color:      accent,
+    fontFamily: BEBAS, fontSize: 20, lineHeight: '24px',
+    cursor:     'pointer', padding: 0,
+    display:    'flex', alignItems: 'center', justifyContent: 'center',
+    userSelect: 'none',
+  }
+
+  const scaleLabel = Number.isInteger(transform.scale)
+    ? `×${transform.scale}`
+    : `×${transform.scale.toFixed(1)}`
+
   return (
     <div
       onClick={handleBackdropClick}
       style={{
-        position: 'fixed', inset: 0,
+        position:   'fixed', inset: 0,
         background: 'rgba(0,0,0,0.75)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 1000,
+        display:    'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex:     1000,
+        paddingRight: sidebarOpen ? 320 : 0,
+        transition: 'padding-right 0.22s cubic-bezier(0.16,1,0.3,1)',
       }}
     >
       <div style={{
@@ -197,18 +330,16 @@ export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPi
         border:        `2px solid ${accent}`,
         display:       'flex',
         flexDirection: 'column',
-        maxHeight:     '90vh',
+        height:        'min(90vh, 720px)',
         width:         660,
         maxWidth:      '95vw',
         animation:     'slideInUp 0.22s cubic-bezier(0.16,1,0.3,1)',
       }}>
 
-        {/* Header */}
+        {/* ── Header ── */}
         <div style={{
-          display:    'flex',
-          alignItems: 'center',
-          gap:        12,
-          padding:    '14px 20px',
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '14px 20px',
           borderBottom: `1px solid ${dividerClr}`,
           flexShrink: 0,
         }}>
@@ -221,41 +352,70 @@ export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPi
               {pixelCount.toLocaleString()} / 40 000 pixels occupés
             </div>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none', border: 'none',
-              color: mutedColor, fontSize: 20,
-              cursor: 'pointer', padding: '4px 8px', lineHeight: 1,
-              fontFamily: MONO, flexShrink: 0,
-            }}
-          >✕</button>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', color: mutedColor,
+            fontSize: 20, cursor: 'pointer', padding: '4px 8px',
+            lineHeight: 1, fontFamily: MONO, flexShrink: 0,
+          }}>✕</button>
         </div>
 
-        {/* Grid */}
-        <div style={{ overflow: 'auto', flex: 1, padding: 12 }}>
-          <canvas
-            ref={canvasRef}
-            width={GRID_SIZE * CELL_SIZE}
-            height={GRID_SIZE * CELL_SIZE}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            onClick={handleClick}
-            style={{
-              display:         'block',
-              cursor:          'crosshair',
-              imageRendering:  'pixelated',
-            }}
-          />
+        {/* ── Grid area ── */}
+        <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', background: '#0a0f1e' }}>
+
+          {/* Canvas wrapper — maintains 1:1 aspect ratio, fills available space */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{
+              position: 'relative',
+              width:  '100%',
+              height: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <canvas
+                ref={canvasRef}
+                width={CANVAS_SIZE}
+                height={CANVAS_SIZE}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={endDrag}
+                onMouseLeave={handleMouseLeave}
+                onClick={handleClick}
+                style={{
+                  display:        'block',
+                  maxWidth:       '100%',
+                  maxHeight:      '100%',
+                  aspectRatio:    '1 / 1',
+                  cursor:         canvasCursor,
+                  imageRendering: 'pixelated',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Zoom controls */}
+          <div style={{
+            position: 'absolute', top: 10, right: 10, zIndex: 2,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+          }}>
+            <button onClick={() => zoomBy(1.5)} style={zBtnBase} title="Zoom avant">+</button>
+            <div style={{
+              fontFamily: MONO, fontSize: 9, color: accent,
+              letterSpacing: 0.5, userSelect: 'none', textAlign: 'center',
+              minWidth: 26,
+            }}>
+              {scaleLabel}
+            </div>
+            <button onClick={() => zoomBy(1 / 1.5)} style={zBtnBase} title="Zoom arrière">−</button>
+          </div>
         </div>
 
-        {/* Footer */}
+        {/* ── Footer ── */}
         <div style={{
-          display:    'flex',
-          alignItems: 'center',
-          gap:        12,
-          padding:    '14px 20px',
-          borderTop:  `1px solid ${dividerClr}`,
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '14px 20px',
+          borderTop: `1px solid ${dividerClr}`,
           flexShrink: 0,
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -275,24 +435,21 @@ export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPi
             onClick={handleBuyClick}
             disabled={pendingCount === 0}
             style={{
-              padding:    '12px 20px',
-              background: pendingCount === 0
+              padding:      '12px 20px',
+              background:   pendingCount === 0
                 ? (isLight ? 'rgba(26,48,128,0.1)' : 'rgba(255,255,255,0.05)')
                 : (isLight
                     ? 'linear-gradient(135deg,#1a3080,#2a45b0)'
                     : 'linear-gradient(135deg,#E8C84A,#c9a830)'),
-              border:     'none',
-              color:      pendingCount === 0
+              border:       'none',
+              color:        pendingCount === 0
                 ? mutedColor
                 : (isLight ? '#ffffff' : '#05080F'),
-              fontFamily: BEBAS,
-              fontSize:   15,
-              letterSpacing: 2,
-              cursor:     pendingCount === 0 ? 'not-allowed' : 'pointer',
-              borderRadius: 2,
-              whiteSpace: 'nowrap',
-              opacity:    pendingCount === 0 ? 0.5 : 1,
-              transition: 'all 0.2s',
+              fontFamily:   BEBAS, fontSize: 15, letterSpacing: 2,
+              cursor:       pendingCount === 0 ? 'not-allowed' : 'pointer',
+              borderRadius: 2, whiteSpace: 'nowrap',
+              opacity:      pendingCount === 0 ? 0.5 : 1,
+              transition:   'all 0.2s',
             }}
           >
             {pendingCount > 0
@@ -302,7 +459,7 @@ export default function CountryModal({ country, onClose, onBuy, onNeedAuth, onPi
         </div>
       </div>
 
-      {/* Floating tooltip */}
+      {/* Tooltip */}
       {tooltip && (
         <div style={{
           position:    'fixed',

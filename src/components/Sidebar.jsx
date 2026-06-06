@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
 
-export default function Sidebar({ country, onClose, onNeedAuth }) {
+export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) {
   const [recState, setRecState]     = useState('idle')
   const [timeLeft, setTimeLeft]     = useState(30)
   const [isPlaying, setIsPlaying]   = useState(false)
@@ -276,7 +276,7 @@ export default function Sidebar({ country, onClose, onNeedAuth }) {
       background: sidebarBg,
       borderLeft: `2px solid ${accent}`,
       boxShadow: shadow,
-      zIndex: 300,
+      zIndex,
       display: 'flex', flexDirection: 'column',
       animation: 'slideInRight 0.22s cubic-bezier(0.16,1,0.3,1)',
       overflowY: 'auto',
