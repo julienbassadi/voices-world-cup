@@ -39,14 +39,11 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
   }, [theme])
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const rankSwipeRef   = useRef({ startX: 0 })
-  const [rankSwipeDelta, setRankSwipeDelta] = useState(0)
+  const rankSwipeRef = useRef({ startX: 0 })
 
-  const onRankSwipeStart = e => { rankSwipeRef.current.startX = e.touches[0].clientX; setRankSwipeDelta(0) }
-  const onRankSwipeMove  = e => { setRankSwipeDelta(e.touches[0].clientX - rankSwipeRef.current.startX) }
-  const onRankSwipeEnd   = () => {
-    if (rankSwipeDelta < -50) { setMobileMenuOpen(false); setRankSwipeDelta(0) }
-    else setRankSwipeDelta(0)
+  const onRankSwipeStart = e => { rankSwipeRef.current.startX = e.touches[0].clientX }
+  const onRankSwipeEnd   = e => {
+    if (e.changedTouches[0].clientX - rankSwipeRef.current.startX < -50) setMobileMenuOpen(false)
   }
 
   // One panel at a time: close ranking when sidebar/VocalSpace opens
@@ -135,131 +132,120 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
   // ── MOBILE LAYOUT ────────────────────────────────────────────────────────────
   if (isMobile) {
     return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 1000, pointerEvents: 'none' }}>
+      <>
+        {/* Main HUD chrome — pointer-events: none so map stays interactive */}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, pointerEvents: 'none' }}>
 
-        {/* Top gradient */}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: 64,
-          background: `linear-gradient(to bottom, ${isDark ? 'rgba(5,8,15,0.88)' : 'rgba(232,237,248,0.92)'} 0%, transparent 100%)`,
-          pointerEvents: 'none',
-        }} />
+          {/* Top gradient */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: 64,
+            background: `linear-gradient(to bottom, ${isDark ? 'rgba(5,8,15,0.88)' : 'rgba(232,237,248,0.92)'} 0%, transparent 100%)`,
+            pointerEvents: 'none',
+          }} />
 
-        {/* Top bar */}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0,
-          height: 52,
-          display: 'flex', alignItems: 'center',
-          padding: '0 12px', gap: 10,
-          pointerEvents: 'auto',
-        }}>
-          {/* Hamburger */}
-          <button
-            onClick={() => setMobileMenuOpen(o => !o)}
-            style={{ ...iconBtn, fontSize: 16, minWidth: 40, minHeight: 40 }}
-            title="Classement"
-          >
-            ☰
-          </button>
+          {/* Top bar */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0,
+            height: 52,
+            display: 'flex', alignItems: 'center',
+            padding: '0 12px', gap: 10,
+            pointerEvents: 'auto',
+          }}>
+            <button
+              onClick={() => setMobileMenuOpen(o => !o)}
+              style={{ ...iconBtn, fontSize: 16, minWidth: 40, minHeight: 40 }}
+            >☰</button>
 
-          {/* Title */}
-          <div style={{ fontFamily: BEBAS, fontSize: 11, letterSpacing: 2, color: accent, lineHeight: 1, flexShrink: 0, pointerEvents: 'none' }}>
-            VOICES WORLD CUP
+            <div style={{ fontFamily: BEBAS, fontSize: 11, letterSpacing: 2, color: accent, lineHeight: 1, flexShrink: 0 }}>
+              VOICES WORLD CUP
+            </div>
+
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+              <CountdownUI compact />
+            </div>
+
+            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} style={{ ...iconBtn, minWidth: 40, minHeight: 40 }}>
+              {isDark ? '☀️' : '🌙'}
+            </button>
           </div>
 
-          {/* Countdown centered in remaining space */}
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <CountdownUI compact />
-          </div>
+          {/* Mes Pixels (hidden when sidebar open) */}
+          {!sidebarOpen && (
+            <div style={{ position: 'absolute', top: 52, right: 12, left: 12, pointerEvents: 'auto' }}>
+              <MyPixels
+                onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} isMobile
+                forceClose={mobileMenuOpen || sidebarOpen}
+                onOpen={() => setMobileMenuOpen(false)}
+              />
+            </div>
+          )}
 
-          {/* Theme */}
-          <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} style={{ ...iconBtn, minWidth: 40, minHeight: 40 }} title="Thème">
-            {isDark ? '☀️' : '🌙'}
-          </button>
+          {/* Bottom gradient + CTA (hidden when sidebar open) */}
+          {!sidebarOpen && (
+            <>
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0, height: 100,
+                background: `linear-gradient(to top, ${bottomBg} 0%, transparent 100%)`,
+                pointerEvents: 'none',
+              }} />
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 14px 28px', pointerEvents: 'auto' }}>
+                <button
+                  onClick={canOpen ? onOpenSidebar : undefined}
+                  style={{
+                    width: '100%', minHeight: 52,
+                    background: canOpen
+                      ? (isDark ? 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)' : 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)')
+                      : (isDark ? 'rgba(232,200,74,0.1)' : 'rgba(26,48,128,0.08)'),
+                    border: 'none',
+                    color: canOpen ? (isDark ? '#05080F' : '#ffffff') : (isDark ? 'rgba(232,200,74,0.28)' : 'rgba(26,48,128,0.28)'),
+                    fontFamily: BEBAS, fontSize: 15, letterSpacing: 3,
+                    cursor: canOpen ? 'pointer' : 'default',
+                    borderRadius: 4, transition: 'background 0.2s, color 0.2s', whiteSpace: 'nowrap',
+                    boxShadow: (!isDark && canOpen) ? '0 2px 12px rgba(26,48,128,0.2)' : 'none',
+                  }}
+                >
+                  {canOpen
+                    ? `${lastHoveredCountry.flag} ${lastHoveredCountry.name.toUpperCase()} — ${fmtVoix(hoveredVoix)} VOIX`
+                    : 'PLACER MA VOIX — 1€ / PIXEL'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Mes Pixels — top right, below top bar (hidden when sidebar open) */}
-        {!sidebarOpen && (
-          <div style={{ position: 'absolute', top: 52, right: 12, left: 12, pointerEvents: 'auto' }}>
-            <MyPixels
-              onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} isMobile
-              forceClose={mobileMenuOpen || sidebarOpen}
-              onOpen={() => setMobileMenuOpen(false)}
-            />
-          </div>
-        )}
-
-        {/* Mobile ranking drawer (slide from left) */}
+        {/* ── Ranking drawer — rendered OUTSIDE the pointer-events:none wrapper ── */}
         {mobileMenuOpen && (
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 1050, background: 'rgba(0,0,0,0.55)' }}
-            onClick={() => setMobileMenuOpen(false)}
-          >
+          <>
+            {/* Fullscreen backdrop — tap anywhere outside drawer to close */}
+            <div
+              style={{
+                position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+                zIndex: 1049, background: 'rgba(0,0,0,0.55)',
+              }}
+              onClick={() => setMobileMenuOpen(false)}
+            />
+
+            {/* Drawer panel — swipe left (deltaX < -50px) to close */}
             <div
               onTouchStart={onRankSwipeStart}
-              onTouchMove={onRankSwipeMove}
               onTouchEnd={onRankSwipeEnd}
-              onClick={e => e.stopPropagation()}
               style={{
-                position: 'absolute', top: 0, left: 0, bottom: 0, width: 260,
+                position: 'fixed', top: 0, left: 0, bottom: 0, width: 260,
+                zIndex: 1050,
                 background: isDark ? 'rgba(5,8,15,0.97)' : 'rgba(232,237,248,0.99)',
                 borderRight: `2px solid ${accent}`,
                 padding: '20px 18px 90px 18px',
                 overflowY: 'auto',
-                animation: rankSwipeDelta === 0 ? 'slideInLeft 0.25s cubic-bezier(0.16,1,0.3,1)' : 'none',
-                transform: `translateX(${Math.min(0, rankSwipeDelta)}px)`,
-                transition: rankSwipeDelta === 0 ? 'transform 0.2s ease' : 'none',
                 display: 'flex', flexDirection: 'column',
-                touchAction: 'pan-y',
+                animation: 'slideInLeft 0.25s cubic-bezier(0.16,1,0.3,1)',
               }}
             >
               <VWCTitle size={16} />
-              <div style={{ marginTop: 14 }}>
-                <RankingRows />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Bottom gradient + CTA (hidden when sidebar open) */}
-        {!sidebarOpen && (
-          <>
-            <div style={{
-              position: 'absolute', bottom: 0, left: 0, right: 0, height: 100,
-              background: `linear-gradient(to top, ${bottomBg} 0%, transparent 100%)`,
-              pointerEvents: 'none',
-            }} />
-            <div style={{
-              position: 'absolute', bottom: 0, left: 0, right: 0,
-              padding: '0 14px 28px',
-              pointerEvents: 'auto',
-            }}>
-              <button
-                onClick={canOpen ? onOpenSidebar : undefined}
-                style={{
-                  width: '100%',
-                  minHeight: 52,
-                  background: canOpen
-                    ? (isDark ? 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)' : 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)')
-                    : (isDark ? 'rgba(232,200,74,0.1)' : 'rgba(26,48,128,0.08)'),
-                  border: 'none',
-                  color: canOpen ? (isDark ? '#05080F' : '#ffffff') : (isDark ? 'rgba(232,200,74,0.28)' : 'rgba(26,48,128,0.28)'),
-                  fontFamily: BEBAS, fontSize: 15, letterSpacing: 3,
-                  cursor: canOpen ? 'pointer' : 'default',
-                  borderRadius: 4,
-                  transition: 'background 0.2s, color 0.2s',
-                  whiteSpace: 'nowrap',
-                  boxShadow: (!isDark && canOpen) ? '0 2px 12px rgba(26,48,128,0.2)' : 'none',
-                }}
-              >
-                {canOpen
-                  ? `${lastHoveredCountry.flag} ${lastHoveredCountry.name.toUpperCase()} — ${fmtVoix(hoveredVoix)} VOIX`
-                  : 'PLACER MA VOIX — 1€ / PIXEL'}
-              </button>
+              <div style={{ marginTop: 14 }}><RankingRows /></div>
             </div>
           </>
         )}
-
-      </div>
+      </>
     )
   }
 
