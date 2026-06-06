@@ -24,10 +24,12 @@ export default function CountryModal({
   const lastClickRef    = useRef(null)
   const mouseDownRef    = useRef(null) // { clientX, clientY } — for drag/click distinction
   const dragRef         = useRef(null) // { startClientX, startClientY, startOffsetX, startOffsetY }
+  const closeTimerRef   = useRef(null)
 
   const [hoveredCell, setHoveredCell] = useState(null)
   const [tooltip, setTooltip]         = useState(null)
   const [isDragging, setIsDragging]   = useState(false)
+  const [isClosing, setIsClosing]     = useState(false)
   const [isLight, setIsLight]         = useState(
     () => document.documentElement.getAttribute('data-theme') === 'light'
   )
@@ -283,11 +285,21 @@ export default function CountryModal({
     onBuy?.(country)
   }, [pendingCount, isLoggedIn, onNeedAuth, onBuy, country])
 
-  const handleBackdropClick = useCallback((e) => {
-    if (e.target === e.currentTarget) onClose?.()
-  }, [onClose])
+  // Triggers closing animation, then calls onClose after it completes
+  const startClose = useCallback(() => {
+    if (isClosing) return
+    setIsClosing(true)
+    closeTimerRef.current = setTimeout(() => onClose?.(), 230)
+  }, [isClosing, onClose])
 
-  useEffect(() => () => clearTimeout(clickTimerRef.current), [])
+  const handleBackdropClick = useCallback((e) => {
+    if (e.target === e.currentTarget) startClose()
+  }, [startClose])
+
+  useEffect(() => () => {
+    clearTimeout(clickTimerRef.current)
+    clearTimeout(closeTimerRef.current)
+  }, [])
 
   if (!country) return null
 
@@ -317,12 +329,14 @@ export default function CountryModal({
     <div
       onClick={handleBackdropClick}
       style={{
-        position:   'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.75)',
-        display:    'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex:     1000,
-        paddingRight: sidebarOpen ? 320 : 0,
-        transition: 'padding-right 0.22s cubic-bezier(0.16,1,0.3,1)',
+        position:      'fixed', inset: 0,
+        background:    'rgba(0,0,0,0.75)',
+        display:       'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex:        1000,
+        paddingRight:  sidebarOpen ? 320 : 0,
+        transition:    'padding-right 0.22s cubic-bezier(0.16,1,0.3,1)',
+        animation:     isClosing ? 'fadeOut 0.22s ease forwards' : 'none',
+        pointerEvents: isClosing ? 'none' : undefined,
       }}
     >
       <div style={{
@@ -333,7 +347,9 @@ export default function CountryModal({
         height:        'min(90vh, 720px)',
         width:         660,
         maxWidth:      '95vw',
-        animation:     'slideInUp 0.22s cubic-bezier(0.16,1,0.3,1)',
+        animation:     isClosing
+          ? 'slideOutDown 0.22s cubic-bezier(0.4,0,1,1) forwards'
+          : 'slideInUp 0.22s cubic-bezier(0.16,1,0.3,1)',
       }}>
 
         {/* ── Header ── */}
@@ -352,7 +368,7 @@ export default function CountryModal({
               {pixelCount.toLocaleString()} / 40 000 pixels occupés
             </div>
           </div>
-          <button onClick={onClose} style={{
+          <button onClick={startClose} style={{
             background: 'none', border: 'none', color: mutedColor,
             fontSize: 20, cursor: 'pointer', padding: '4px 8px',
             lineHeight: 1, fontFamily: MONO, flexShrink: 0,
