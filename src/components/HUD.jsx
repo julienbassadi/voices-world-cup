@@ -28,7 +28,7 @@ function useCountdown() {
 
 const fmtVoix = n => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 
-export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpace, onOpenAuth, sidebarOpen = false }) {
+export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpace, onOpenAuth, sidebarOpen = false, onNavigateToPixel }) {
   const { jj, hh, mm, ss } = useCountdown()
   const isMobile = useMobile()
 
@@ -176,6 +176,7 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
                 onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} isMobile
                 forceClose={mobileMenuOpen || sidebarOpen}
                 onOpen={() => setMobileMenuOpen(false)}
+                onNavigateToPixel={onNavigateToPixel}
               />
             </div>
           )}
@@ -297,7 +298,7 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
       {/* Top right: Mes Pixels panel (hidden when sidebar open) */}
       {!sidebarOpen && (
         <div style={{ position: 'absolute', top: 50, right: 20, width: 272, pointerEvents: 'auto' }}>
-          <MyPixels onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} forceClose={sidebarOpen} />
+          <MyPixels onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} forceClose={sidebarOpen} onNavigateToPixel={onNavigateToPixel} />
         </div>
       )}
 

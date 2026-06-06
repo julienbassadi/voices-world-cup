@@ -84,6 +84,7 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
   const groupsRef       = useRef({})
   const overlayPathsRef = useRef({})
   const projCentroidRef = useRef(null)
+  const projectionRef   = useRef(null)
   const callbacksRef    = useRef({ onCountryClick, onCountryHover })
   const zoomRef         = useRef(null)
   const zoomResetFirstRef = useRef(true)
@@ -94,10 +95,11 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
     callbacksRef.current = { onCountryClick, onCountryHover }
   }, [onCountryClick, onCountryHover])
 
-  const pixelsByCountry = useMapStore(s => s.pixelsByCountry)
-  const frPixelCount    = (pixelsByCountry.fr ?? []).length
-  const frScale         = 1 + frPixelCount * 0.0008
-  const zoomResetKey    = useMapStore(s => s.zoomResetKey)
+  const pixelsByCountry      = useMapStore(s => s.pixelsByCountry)
+  const frPixelCount         = (pixelsByCountry.fr ?? []).length
+  const frScale              = 1 + frPixelCount * 0.0008
+  const zoomResetKey         = useMapStore(s => s.zoomResetKey)
+  const zoomToCountrySignal  = useMapStore(s => s.zoomToCountrySignal)
 
   // ─── D3 setup — runs once ────────────────────────────────────────────────
   useEffect(() => {
@@ -118,6 +120,7 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
 
     const tileW = 2 * Math.PI * projection.scale()
     projCentroidRef.current = projection(d3.geoCentroid(franceData))
+    projectionRef.current = projection
 
     ;[-1, 0, 1].forEach(dx => {
       const suf  = dx === -1 ? 'L' : dx === 1 ? 'R' : 'C'
@@ -261,6 +264,29 @@ export default function WorldMap({ onCountryClick, onCountryHover }) {
       d3.select(svgRef.current).call(zoomRef.current.transform, d3.zoomIdentity)
     }
   }, [zoomResetKey])
+
+  // ─── Animated zoom to a country ───────────────────────────────────────────
+  useEffect(() => {
+    if (!zoomToCountrySignal || !zoomRef.current || !svgRef.current || !projectionRef.current) return
+    const { iso } = zoomToCountrySignal
+    const countryMeta = QUALIFIED.find(c => c.iso === iso)
+    if (!countryMeta) return
+    const feature = countryMeta.iso === 'fr'
+      ? franceData
+      : WORLD_FEATURES.find(f => f.id === toWorldId(countryMeta.numId))
+    if (!feature) return
+    const centroid = projectionRef.current(d3.geoCentroid(feature))
+    if (!centroid) return
+    const svgEl = svgRef.current
+    const width  = svgEl.clientWidth
+    const height = svgEl.clientHeight
+    const k  = 3
+    const tx = width  / 2 - k * centroid[0]
+    const ty = height / 2 - k * centroid[1]
+    d3.select(svgEl)
+      .transition().duration(800).ease(d3.easeCubicInOut)
+      .call(zoomRef.current.transform, d3.zoomIdentity.translate(tx, ty).scale(k))
+  }, [zoomToCountrySignal])
 
   // ─── Sync pixel count → overlay intensity ─────────────────────────────────
   useEffect(() => {

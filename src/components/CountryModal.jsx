@@ -19,6 +19,7 @@ export default function CountryModal({
   onBuy,
   onNeedAuth,
   onPixelDoubleClick,
+  highlightPixel = null,
 }) {
   const isMobile = useMobile()
 
@@ -34,6 +35,7 @@ export default function CountryModal({
   const [tooltip, setTooltip]         = useState(null)
   const [isDragging, setIsDragging]   = useState(false)
   const [isClosing, setIsClosing]     = useState(false)
+  const [pulsePhase, setPulsePhase]   = useState(0)
   const [isLight, setIsLight]         = useState(
     () => document.documentElement.getAttribute('data-theme') === 'light'
   )
@@ -139,7 +141,29 @@ export default function CountryModal({
     }
 
     ctx.restore()
-  }, [pixelMap, pendingGridPixels, hoveredCell, country, transform])
+
+    // Pulse ring over highlighted pixel
+    if (highlightPixel && pulsePhase > 0) {
+      const { gridX, gridY } = highlightPixel
+      if (gridX >= x0 && gridX <= x1 && gridY >= y0 && gridY <= y1) {
+        const { scale, offsetX, offsetY } = transform
+        ctx.save()
+        ctx.translate(offsetX, offsetY)
+        ctx.scale(scale, scale)
+        const hx = gridX * CELL_SIZE
+        const hy = gridY * CELL_SIZE
+        ctx.strokeStyle = '#E8C84A'
+        ctx.lineWidth   = 2 / scale
+        ctx.globalAlpha = pulsePhase
+        ctx.shadowColor = '#E8C84A'
+        ctx.shadowBlur  = 8 / scale
+        ctx.strokeRect(hx - 1.5 / scale, hy - 1.5 / scale, CELL_SIZE + 3 / scale, CELL_SIZE + 3 / scale)
+        ctx.shadowBlur  = 0
+        ctx.globalAlpha = 1
+        ctx.restore()
+      }
+    }
+  }, [pixelMap, pendingGridPixels, hoveredCell, country, transform, highlightPixel, pulsePhase])
 
   // ── Wheel zoom (non-passive for preventDefault) ────────────────────────────
   useEffect(() => {
@@ -371,6 +395,30 @@ export default function CountryModal({
     handleClickRef.current = handleClick
     touchHandlerRef.current.handleClick = handleClick
   }, [handleClick])
+
+  // ── Pan + pulse on highlighted pixel (from "Mes Pixels" navigation) ─────
+  useEffect(() => {
+    if (!highlightPixel) { setPulsePhase(0); return }
+    const { gridX, gridY } = highlightPixel
+    // Center the target pixel in the canvas at scale 4
+    const targetScale = 4
+    const cx = gridX * CELL_SIZE + CELL_SIZE / 2
+    const cy = gridY * CELL_SIZE + CELL_SIZE / 2
+    applyTransform({
+      scale:   targetScale,
+      offsetX: clampOffset(CANVAS_SIZE / 2 - cx * targetScale, targetScale),
+      offsetY: clampOffset(CANVAS_SIZE / 2 - cy * targetScale, targetScale),
+    })
+    // Pulse for ~2.4s (12 frames × 200ms)
+    let frame = 0
+    setPulsePhase(1)
+    const id = setInterval(() => {
+      frame++
+      setPulsePhase(frame % 2 === 0 ? 1 : 0.35)
+      if (frame >= 12) { clearInterval(id); setPulsePhase(0) }
+    }, 200)
+    return () => clearInterval(id)
+  }, [highlightPixel, applyTransform])
 
   // ── Zoom buttons ──────────────────────────────────────────────────────────
   const zoomBy = useCallback((factor) => {

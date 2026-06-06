@@ -30,6 +30,9 @@ const useMapStore = create((set, get) => ({
   zoomResetKey: 0,
   triggerZoomReset: () => set(s => ({ zoomResetKey: s.zoomResetKey + 1 })),
 
+  zoomToCountrySignal: null,
+  zoomToCountry: (iso) => set({ zoomToCountrySignal: { iso, ts: Date.now() } }),
+
   playingPixels: new Set(),
   setPlayingPixels: ids => set({ playingPixels: ids instanceof Set ? ids : new Set(ids) }),
 

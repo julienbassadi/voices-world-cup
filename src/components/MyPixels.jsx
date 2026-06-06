@@ -8,7 +8,7 @@ import PixelShareModal from './PixelShareModal'
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
 
-export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobile = false, forceClose = false, onOpen }) {
+export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobile = false, forceClose = false, onOpen, onNavigateToPixel }) {
   const [isOpen, setIsOpen]               = useState(false)
   const [commentCounts, setCommentCounts] = useState({})
   const [sharePixel, setSharePixel]       = useState(null)
@@ -108,13 +108,21 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobil
     const country = QUALIFIED.find(c => c.iso === px.countryIso)
     if (!country) return null
     const cCount = commentCounts[px.id] ?? 0
+    const handleRowClick = () => {
+      handleClose()
+      onNavigateToPixel?.({ iso: px.countryIso, gridX: px.gridX, gridY: px.gridY })
+    }
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 7,
-        padding: isMobile ? '10px 14px' : '7px 10px',
-        borderBottom: `1px solid ${dividerClr}`,
-        background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(30,58,138,0.02)',
-      }}>
+      <div
+        onClick={handleRowClick}
+        style={{
+          display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 7,
+          padding: isMobile ? '10px 14px' : '7px 10px',
+          borderBottom: `1px solid ${dividerClr}`,
+          background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(30,58,138,0.02)',
+          cursor: 'pointer',
+        }}
+      >
         <div style={{
           width: isMobile ? 14 : 12, height: isMobile ? 14 : 12, flexShrink: 0, borderRadius: 1,
           background: px.color ?? '#E8C84A',
@@ -130,7 +138,10 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobil
             <span style={{ fontFamily: MONO, fontSize: isMobile ? 10 : 8, color: mutedColor }}>💬 {cCount}</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: isMobile ? 6 : 3, flexShrink: 0 }}>
+        <div
+          style={{ display: 'flex', gap: isMobile ? 6 : 3, flexShrink: 0 }}
+          onClick={e => e.stopPropagation()}
+        >
           <button onClick={() => handlePlay(px)} style={iconBtnStyle} title="Écouter">▶</button>
           <button onClick={() => handleView(px)} style={iconBtnStyle} title="Voir">💬</button>
           <button onClick={() => handleShare(px)} style={iconBtnStyle} title="Partager">🔗</button>

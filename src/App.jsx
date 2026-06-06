@@ -15,7 +15,9 @@ export default function App() {
   const [showAuth, setShowAuth]                 = useState(false)
   const [showAuthTab, setShowAuthTab]           = useState('login')
   const [pixelView, setPixelView]               = useState(null) // { country, pixel }
+  const [pendingHighlight, setPendingHighlight] = useState(null) // { gridX, gridY }
   const authCallbackRef                         = useRef(null)
+  const navigateTimerRef                        = useRef(null)
 
   useEffect(() => {
     useMapStore.getState().loadPixels()
@@ -39,6 +41,7 @@ export default function App() {
   const handleModalClose = useCallback(() => {
     setCountryModal(null)
     setSelectedCountry(null)
+    setPendingHighlight(null)
     useMapStore.getState().clearGridPendingPixels()
   }, [])
 
@@ -70,6 +73,23 @@ export default function App() {
     setSelectedCountry(null)
     useMapStore.getState().clearGridPendingPixels()
     setPixelView({ country, pixel })
+  }, [])
+
+  // "Mes Pixels" row click → zoom map to country + open grid modal + highlight pixel
+  const handleNavigateToPixel = useCallback(({ iso, gridX, gridY }) => {
+    setPixelView(null)
+    setSelectedCountry(null)
+    setCountryModal(null)
+    setPendingHighlight(null)
+    useMapStore.getState().clearGridPendingPixels()
+    const country = QUALIFIED.find(c => c.iso === iso)
+    if (!country) return
+    useMapStore.getState().zoomToCountry(iso)
+    clearTimeout(navigateTimerRef.current)
+    navigateTimerRef.current = setTimeout(() => {
+      setCountryModal(country)
+      if (gridX != null && gridY != null) setPendingHighlight({ gridX, gridY })
+    }, 500)
   }, [])
 
   const handleNeedAuth = useCallback((cb) => {
@@ -112,6 +132,7 @@ export default function App() {
         onOpenVocalSpace={handleHUDOpenVocalSpace}
         onOpenAuth={handleOpenAuth}
         sidebarOpen={sidebarOpen}
+        onNavigateToPixel={handleNavigateToPixel}
       />
 
       {/* Dark backdrop behind VocalSpace — click closes it */}
@@ -150,6 +171,7 @@ export default function App() {
           onBuy={handleModalBuy}
           onNeedAuth={handleNeedAuth}
           onPixelDoubleClick={handlePixelDoubleClick}
+          highlightPixel={pendingHighlight}
         />
       )}
 
