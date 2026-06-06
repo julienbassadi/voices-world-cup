@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import useMapStore from '../store/mapStore'
+import { useMobile } from '../hooks/useMobile'
 
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
@@ -31,6 +32,7 @@ function renderDescription(text) {
 }
 
 export default function VocalSpace({ country, pixel, onClose }) {
+  const isMobile = useMobile()
   const [isLight, setIsLight] = useState(
     () => document.documentElement.getAttribute('data-theme') === 'light'
   )
@@ -41,7 +43,22 @@ export default function VocalSpace({ country, pixel, onClose }) {
   const [likes, setLikes]               = useState(pixel.likes ?? 0)
   const [hasLiked, setHasLiked]         = useState(false)
   const [isLiking, setIsLiking]         = useState(false)
-  const audioRef = useRef(null)
+  const audioRef   = useRef(null)
+  const swipeRef   = useRef({ startY: 0 })
+  const [swipeDelta, setSwipeDelta] = useState(0)
+
+  const onSwipeStart = e => {
+    swipeRef.current.startY = e.touches[0].clientY
+    setSwipeDelta(0)
+  }
+  const onSwipeMove = e => {
+    const delta = Math.max(0, e.touches[0].clientY - swipeRef.current.startY)
+    setSwipeDelta(delta)
+  }
+  const onSwipeEnd = () => {
+    if (swipeDelta > 80) { onClose(); setSwipeDelta(0) }
+    else setSwipeDelta(0)
+  }
 
   const likeKey    = `liked_pixel_${pixel.id}`
   const pixelColor = pixel.color ?? '#E8C84A'
@@ -137,30 +154,63 @@ export default function VocalSpace({ country, pixel, onClose }) {
   const inputBdr   = isLight ? 'rgba(26,48,128,0.18)' : 'rgba(255,255,255,0.12)'
   const shadow     = isLight ? '0 2px 12px rgba(0,0,0,0.15)' : 'none'
 
+  const mobileSheet = isMobile ? {
+    bottom: 0, left: 0, right: 0,
+    width: 'auto', top: 'auto',
+    height: 'min(88vh, 720px)',
+    borderTop: `2px solid ${accent}`,
+    borderLeft: 'none',
+    borderRadius: '12px 12px 0 0',
+    animation: swipeDelta === 0 ? 'slideInUp 0.28s cubic-bezier(0.16,1,0.3,1)' : 'none',
+    transform: `translateY(${swipeDelta}px)`,
+    transition: swipeDelta === 0 ? 'transform 0.2s ease' : 'none',
+  } : {
+    right: 0, top: 0, bottom: 0, width: 320,
+    borderLeft: `2px solid ${accent}`,
+    animation: 'slideInRight 0.22s cubic-bezier(0.16,1,0.3,1)',
+  }
+
   return (
     <div style={{
-      position: 'fixed', right: 0, top: 0, bottom: 0, width: 320,
+      position: 'fixed',
+      ...mobileSheet,
       background: sidebarBg,
-      borderLeft: `2px solid ${accent}`,
       boxShadow: shadow,
       zIndex: 300,
       display: 'flex', flexDirection: 'column',
-      animation: 'slideInRight 0.22s cubic-bezier(0.16,1,0.3,1)',
       overflowY: 'auto',
     }}>
 
+      {/* Mobile drag zone (pill + swipe target) */}
+      {isMobile && (
+        <div
+          onTouchStart={onSwipeStart}
+          onTouchMove={onSwipeMove}
+          onTouchEnd={onSwipeEnd}
+          style={{ touchAction: 'none', cursor: 'grab', flexShrink: 0, display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}
+        >
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)' }} />
+        </div>
+      )}
+
       {/* Close */}
       <button onClick={onClose} style={{
-        position: 'absolute', top: 16, left: 18,
-        background: 'none', border: 'none',
-        color: muted, fontSize: 20,
-        cursor: 'pointer', lineHeight: 1, padding: 6, fontFamily: MONO,
+        position: 'absolute',
+        top: isMobile ? 8 : 16,
+        ...(isMobile ? { right: 14 } : { left: 18 }),
+        background: isLight ? 'rgba(26,48,128,0.08)' : 'rgba(255,255,255,0.08)',
+        border: `1px solid ${isLight ? 'rgba(26,48,128,0.18)' : 'rgba(255,255,255,0.15)'}`,
+        color: muted, fontSize: 16,
+        cursor: 'pointer', lineHeight: 1, fontFamily: MONO,
+        minWidth: 36, minHeight: 36,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        borderRadius: 4,
       }}>✕</button>
 
       {/* Country header */}
-      <div style={{ padding: '36px 28px 20px', paddingLeft: 52 }}>
-        <div style={{ fontSize: 52, lineHeight: 1, marginBottom: 10 }}>{country.flag}</div>
-        <div style={{ fontFamily: BEBAS, fontSize: 32, color: accent, letterSpacing: 2 }}>
+      <div style={{ padding: isMobile ? '8px 20px 16px' : '36px 28px 20px', paddingLeft: isMobile ? 20 : 52 }}>
+        <div style={{ fontSize: isMobile ? 44 : 52, lineHeight: 1, marginBottom: 10 }}>{country.flag}</div>
+        <div style={{ fontFamily: BEBAS, fontSize: isMobile ? 26 : 32, color: accent, letterSpacing: 2 }}>
           {country.name}
         </div>
         <div style={{ fontFamily: MONO, color: muted, fontSize: 10, marginTop: 4, letterSpacing: 1 }}>

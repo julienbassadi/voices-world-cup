@@ -29,6 +29,21 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
   const audioUrlRef      = useRef(null)
   const audioPlayerRef   = useRef(null)
   const timerRef         = useRef(null)
+  const swipeRef         = useRef({ startY: 0 })
+  const [swipeDelta, setSwipeDelta] = useState(0)
+
+  const onSwipeStart = e => {
+    swipeRef.current.startY = e.touches[0].clientY
+    setSwipeDelta(0)
+  }
+  const onSwipeMove = e => {
+    const delta = Math.max(0, e.touches[0].clientY - swipeRef.current.startY)
+    setSwipeDelta(delta)
+  }
+  const onSwipeEnd = () => {
+    if (swipeDelta > 80) { onClose(); setSwipeDelta(0) }
+    else setSwipeDelta(0)
+  }
 
   const pixelsByCountry   = useMapStore(s => s.pixelsByCountry)
   const pendingGridPixels = useMapStore(s => s.pendingGridPixels)
@@ -280,7 +295,9 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
     borderTop: `2px solid ${accent}`,
     borderLeft: 'none',
     borderRadius: '12px 12px 0 0',
-    animation: 'slideInUp 0.28s cubic-bezier(0.16,1,0.3,1)',
+    animation: swipeDelta === 0 ? 'slideInUp 0.28s cubic-bezier(0.16,1,0.3,1)' : 'none',
+    transform: `translateY(${swipeDelta}px)`,
+    transition: swipeDelta === 0 ? 'transform 0.2s ease' : 'none',
   } : {
     right: 0, top: 0, bottom: 0, width: 320,
     borderLeft: `2px solid ${accent}`,
@@ -297,9 +314,16 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
       display: 'flex', flexDirection: 'column',
       overflowY: 'auto',
     }}>
-      {/* Drag pill on mobile */}
+      {/* Mobile drag zone */}
       {isMobile && (
-        <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', width: 36, height: 4, borderRadius: 2, background: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }} />
+        <div
+          onTouchStart={onSwipeStart}
+          onTouchMove={onSwipeMove}
+          onTouchEnd={onSwipeEnd}
+          style={{ touchAction: 'none', cursor: 'grab', flexShrink: 0, display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}
+        >
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: !isLight ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }} />
+        </div>
       )}
 
       {/* Close */}

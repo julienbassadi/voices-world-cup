@@ -12,6 +12,21 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobil
   const [isOpen, setIsOpen]               = useState(false)
   const [commentCounts, setCommentCounts] = useState({})
   const [sharePixel, setSharePixel]       = useState(null)
+  const swipeRef   = useRef({ startY: 0 })
+  const [swipeDelta, setSwipeDelta]       = useState(0)
+
+  const onSwipeStart = e => {
+    swipeRef.current.startY = e.touches[0].clientY
+    setSwipeDelta(0)
+  }
+  const onSwipeMove = e => {
+    const delta = Math.max(0, e.touches[0].clientY - swipeRef.current.startY)
+    setSwipeDelta(delta)
+  }
+  const onSwipeEnd = () => {
+    if (swipeDelta > 80) { setIsOpen(false); setSwipeDelta(0) }
+    else setSwipeDelta(0)
+  }
 
   const user            = useAuthStore(s => s.user)
   const isLoggedIn      = useAuthStore(s => s.isLoggedIn)
@@ -232,26 +247,37 @@ export default function MyPixels({ onOpenVocalSpace, isDark, onOpenAuth, isMobil
                 borderRadius: '12px 12px 0 0',
                 maxHeight: '80vh',
                 display: 'flex', flexDirection: 'column',
-                animation: 'slideInUp 0.28s cubic-bezier(0.16,1,0.3,1)',
+                animation: swipeDelta === 0 ? 'slideInUp 0.28s cubic-bezier(0.16,1,0.3,1)' : 'none',
+                transform: `translateY(${swipeDelta}px)`,
+                transition: swipeDelta === 0 ? 'transform 0.2s ease' : 'none',
               }}
             >
-              {/* Sheet header */}
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '14px 16px 10px',
-                borderBottom: `1px solid ${dividerClr}`,
-                flexShrink: 0,
-              }}>
+              {/* Drag zone — covers pill + header, catches swipe-down */}
+              <div
+                onTouchStart={onSwipeStart}
+                onTouchMove={onSwipeMove}
+                onTouchEnd={onSwipeEnd}
+                style={{ touchAction: 'none', cursor: 'grab', flexShrink: 0 }}
+              >
                 {/* Drag pill */}
-                <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', width: 36, height: 4, borderRadius: 2, background: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }} />
-                <div style={{ fontFamily: BEBAS, fontSize: 16, color: accent, letterSpacing: 2 }}>
-                  MES PIXELS
-                  {isLoggedIn && userPixels.length > 0 && <span style={{ opacity: 0.6, marginLeft: 6, fontSize: 13 }}>({userPixels.length})</span>}
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+                  <div style={{ width: 36, height: 4, borderRadius: 2, background: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }} />
                 </div>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  style={{ background: 'none', border: 'none', color: mutedColor, fontSize: 18, cursor: 'pointer', padding: '4px 8px', lineHeight: 1, fontFamily: MONO, minHeight: 44 }}
-                >✕</button>
+                {/* Sheet header */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '0 16px 10px',
+                  borderBottom: `1px solid ${dividerClr}`,
+                }}>
+                  <div style={{ fontFamily: BEBAS, fontSize: 16, color: accent, letterSpacing: 2 }}>
+                    MES PIXELS
+                    {isLoggedIn && userPixels.length > 0 && <span style={{ opacity: 0.6, marginLeft: 6, fontSize: 13 }}>({userPixels.length})</span>}
+                  </div>
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    style={{ background: 'none', border: 'none', color: mutedColor, fontSize: 18, cursor: 'pointer', padding: '4px 8px', lineHeight: 1, fontFamily: MONO, minHeight: 44 }}
+                  >✕</button>
+                </div>
               </div>
 
               {/* Scrollable content */}

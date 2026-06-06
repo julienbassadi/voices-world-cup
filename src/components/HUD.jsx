@@ -28,7 +28,7 @@ function useCountdown() {
 
 const fmtVoix = n => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 
-export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpace, onOpenAuth }) {
+export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpace, onOpenAuth, sidebarOpen = false }) {
   const { jj, hh, mm, ss } = useCountdown()
   const isMobile = useMobile()
 
@@ -162,10 +162,12 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
           </div>
         </div>
 
-        {/* Mes Pixels — top right, below top bar */}
-        <div style={{ position: 'absolute', top: 52, right: 12, left: 12, pointerEvents: 'auto' }}>
-          <MyPixels onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} isMobile />
-        </div>
+        {/* Mes Pixels — top right, below top bar (hidden when sidebar open) */}
+        {!sidebarOpen && (
+          <div style={{ position: 'absolute', top: 52, right: 12, left: 12, pointerEvents: 'auto' }}>
+            <MyPixels onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} isMobile />
+          </div>
+        )}
 
         {/* Mobile ranking drawer (slide from left) */}
         {mobileMenuOpen && (
@@ -185,47 +187,62 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
                 display: 'flex', flexDirection: 'column',
               }}
             >
+              {/* Close X */}
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  position: 'absolute', top: 12, right: 12,
+                  background: 'none', border: 'none',
+                  color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(26,48,128,0.6)',
+                  fontSize: 20, cursor: 'pointer', lineHeight: 1,
+                  minWidth: 44, minHeight: 44,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: MONO,
+                }}
+              >✕</button>
               <RankingRows />
             </div>
           </div>
         )}
 
-        {/* Bottom gradient */}
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0, height: 100,
-          background: `linear-gradient(to top, ${bottomBg} 0%, transparent 100%)`,
-          pointerEvents: 'none',
-        }} />
-
-        {/* Bottom CTA */}
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0,
-          padding: '0 14px 28px',
-          pointerEvents: 'auto',
-        }}>
-          <button
-            onClick={canOpen ? onOpenSidebar : undefined}
-            style={{
-              width: '100%',
-              minHeight: 52,
-              background: canOpen
-                ? (isDark ? 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)' : 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)')
-                : (isDark ? 'rgba(232,200,74,0.1)' : 'rgba(26,48,128,0.08)'),
-              border: 'none',
-              color: canOpen ? (isDark ? '#05080F' : '#ffffff') : (isDark ? 'rgba(232,200,74,0.28)' : 'rgba(26,48,128,0.28)'),
-              fontFamily: BEBAS, fontSize: 15, letterSpacing: 3,
-              cursor: canOpen ? 'pointer' : 'default',
-              borderRadius: 4,
-              transition: 'background 0.2s, color 0.2s',
-              whiteSpace: 'nowrap',
-              boxShadow: (!isDark && canOpen) ? '0 2px 12px rgba(26,48,128,0.2)' : 'none',
-            }}
-          >
-            {canOpen
-              ? `${lastHoveredCountry.flag} ${lastHoveredCountry.name.toUpperCase()} — ${fmtVoix(hoveredVoix)} VOIX`
-              : 'PLACER MA VOIX — 1€ / PIXEL'}
-          </button>
-        </div>
+        {/* Bottom gradient + CTA (hidden when sidebar open) */}
+        {!sidebarOpen && (
+          <>
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0, height: 100,
+              background: `linear-gradient(to top, ${bottomBg} 0%, transparent 100%)`,
+              pointerEvents: 'none',
+            }} />
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              padding: '0 14px 28px',
+              pointerEvents: 'auto',
+            }}>
+              <button
+                onClick={canOpen ? onOpenSidebar : undefined}
+                style={{
+                  width: '100%',
+                  minHeight: 52,
+                  background: canOpen
+                    ? (isDark ? 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)' : 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)')
+                    : (isDark ? 'rgba(232,200,74,0.1)' : 'rgba(26,48,128,0.08)'),
+                  border: 'none',
+                  color: canOpen ? (isDark ? '#05080F' : '#ffffff') : (isDark ? 'rgba(232,200,74,0.28)' : 'rgba(26,48,128,0.28)'),
+                  fontFamily: BEBAS, fontSize: 15, letterSpacing: 3,
+                  cursor: canOpen ? 'pointer' : 'default',
+                  borderRadius: 4,
+                  transition: 'background 0.2s, color 0.2s',
+                  whiteSpace: 'nowrap',
+                  boxShadow: (!isDark && canOpen) ? '0 2px 12px rgba(26,48,128,0.2)' : 'none',
+                }}
+              >
+                {canOpen
+                  ? `${lastHoveredCountry.flag} ${lastHoveredCountry.name.toUpperCase()} — ${fmtVoix(hoveredVoix)} VOIX`
+                  : 'PLACER MA VOIX — 1€ / PIXEL'}
+              </button>
+            </div>
+          </>
+        )}
 
       </div>
     )
@@ -274,40 +291,44 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
         </button>
       </div>
 
-      {/* Top right: Mes Pixels panel */}
-      <div style={{ position: 'absolute', top: 50, right: 20, width: 272, pointerEvents: 'auto' }}>
-        <MyPixels onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} />
-      </div>
+      {/* Top right: Mes Pixels panel (hidden when sidebar open) */}
+      {!sidebarOpen && (
+        <div style={{ position: 'absolute', top: 50, right: 20, width: 272, pointerEvents: 'auto' }}>
+          <MyPixels onOpenVocalSpace={onOpenVocalSpace} isDark={isDark} onOpenAuth={onOpenAuth} />
+        </div>
+      )}
 
-      {/* Bottom: hexagonal CTA */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, height: 76,
-        background: `linear-gradient(to top, ${bottomBg} 0%, transparent 100%)`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <button
-          onClick={canOpen ? onOpenSidebar : undefined}
-          style={{
-            pointerEvents: 'auto',
-            clipPath: 'polygon(18px 0%, calc(100% - 18px) 0%, 100% 50%, calc(100% - 18px) 100%, 18px 100%, 0% 50%)',
-            background: canOpen
-              ? (isDark ? 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)' : 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)')
-              : (isDark ? 'rgba(232,200,74,0.1)' : 'rgba(26,48,128,0.08)'),
-            border: 'none',
-            color: canOpen ? (isDark ? '#05080F' : '#ffffff') : (isDark ? 'rgba(232,200,74,0.28)' : 'rgba(26,48,128,0.28)'),
-            fontFamily: BEBAS, fontSize: 15, letterSpacing: 3,
-            padding: '13px 52px',
-            cursor: canOpen ? 'pointer' : 'default',
-            transition: 'background 0.2s, color 0.2s',
-            whiteSpace: 'nowrap',
-            boxShadow: (!isDark && canOpen) ? '0 2px 12px rgba(26,48,128,0.2)' : 'none',
-          }}
-        >
-          {canOpen
-            ? `${lastHoveredCountry.flag} ${lastHoveredCountry.name.toUpperCase()} — ${fmtVoix(hoveredVoix)} VOIX`
-            : 'PLACER MA VOIX — 1€ / PIXEL'}
-        </button>
-      </div>
+      {/* Bottom: hexagonal CTA (hidden when sidebar open) */}
+      {!sidebarOpen && (
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: 76,
+          background: `linear-gradient(to top, ${bottomBg} 0%, transparent 100%)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <button
+            onClick={canOpen ? onOpenSidebar : undefined}
+            style={{
+              pointerEvents: 'auto',
+              clipPath: 'polygon(18px 0%, calc(100% - 18px) 0%, 100% 50%, calc(100% - 18px) 100%, 18px 100%, 0% 50%)',
+              background: canOpen
+                ? (isDark ? 'linear-gradient(135deg, #E8C84A 0%, #c9a830 100%)' : 'linear-gradient(135deg, #1a3080 0%, #2a45b0 100%)')
+                : (isDark ? 'rgba(232,200,74,0.1)' : 'rgba(26,48,128,0.08)'),
+              border: 'none',
+              color: canOpen ? (isDark ? '#05080F' : '#ffffff') : (isDark ? 'rgba(232,200,74,0.28)' : 'rgba(26,48,128,0.28)'),
+              fontFamily: BEBAS, fontSize: 15, letterSpacing: 3,
+              padding: '13px 52px',
+              cursor: canOpen ? 'pointer' : 'default',
+              transition: 'background 0.2s, color 0.2s',
+              whiteSpace: 'nowrap',
+              boxShadow: (!isDark && canOpen) ? '0 2px 12px rgba(26,48,128,0.2)' : 'none',
+            }}
+          >
+            {canOpen
+              ? `${lastHoveredCountry.flag} ${lastHoveredCountry.name.toUpperCase()} — ${fmtVoix(hoveredVoix)} VOIX`
+              : 'PLACER MA VOIX — 1€ / PIXEL'}
+          </button>
+        </div>
+      )}
 
     </div>
   )

@@ -97,6 +97,8 @@ export default function App() {
     authCallbackRef.current = null
   }, [])
 
+  const sidebarOpen = !!(selectedCountry || pixelView)
+
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: 'var(--bg)' }}>
       <WorldMap
@@ -108,7 +110,16 @@ export default function App() {
         onOpenSidebar={handleOpenSidebar}
         onOpenVocalSpace={handleHUDOpenVocalSpace}
         onOpenAuth={handleOpenAuth}
+        sidebarOpen={sidebarOpen}
       />
+
+      {/* Transparent overlay behind sidebar — click anywhere on map closes it */}
+      {sidebarOpen && !countryModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 290 }}
+          onClick={handleCloseSidebar}
+        />
+      )}
 
       {/* VocalSpace overlays everything */}
       {pixelView && (
