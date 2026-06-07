@@ -5,7 +5,7 @@ import { QUALIFIED } from '../components/WorldMap'
 
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
-const SITE  = 'https://voicesworldcup.vercel.app'
+const SITE  = 'https://talktotheplanet.com'
 
 function fmtDate(iso) {
   if (!iso) return ''

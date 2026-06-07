@@ -51,7 +51,7 @@ const useAuthStore = create((set, get) => ({
   sendMagicLink: async (email) => {
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: 'https://voicesworldcup.vercel.app' },
+      options: { emailRedirectTo: 'https://talktotheplanet.com' },
     })
     if (error) throw error
   },

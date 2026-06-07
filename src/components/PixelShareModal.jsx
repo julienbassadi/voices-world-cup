@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas'
 
 const BEBAS = "'Bebas Neue', Impact, sans-serif"
 const MONO  = "'DM Mono', monospace"
-const SITE  = 'https://voicesworldcup.vercel.app'
+const SITE  = 'https://talktotheplanet.com'
 
 // Seeded stable bars (same as PixelPage)
 function makeBars(n = 44) {
