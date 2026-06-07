@@ -7,21 +7,23 @@ import AudioLayer from './components/AudioLayer'
 import Auth from './components/Auth'
 import VocalSpace from './components/VocalSpace'
 import useMapStore from './store/mapStore'
+import useAuthStore from './store/authStore'
 
 export default function App() {
   const [countryModal, setCountryModal]         = useState(null) // country → pixel grid modal
   const [selectedCountry, setSelectedCountry]   = useState(null) // country → recording sidebar
   const [lastHoveredCountry, setLastHoveredCountry] = useState(null)
   const [showAuth, setShowAuth]                 = useState(false)
-  const [showAuthTab, setShowAuthTab]           = useState('login')
   const [pixelView, setPixelView]               = useState(null) // { country, pixel }
   const [pendingHighlight, setPendingHighlight] = useState(null) // { gridX, gridY }
   const authCallbackRef                         = useRef(null)
   const navigateTimerRef                        = useRef(null)
 
   useEffect(() => {
+    const unsubAuth  = useAuthStore.getState().init()
     useMapStore.getState().loadPixels()
-    return useMapStore.getState().subscribeToPixels()
+    const unsubPixels = useMapStore.getState().subscribeToPixels()
+    return () => { unsubAuth?.(); unsubPixels?.() }
   }, [])
 
   const handleCountryClick = useCallback(country => {
@@ -94,23 +96,12 @@ export default function App() {
 
   const handleNeedAuth = useCallback((cb) => {
     authCallbackRef.current = cb
-    setShowAuthTab('login')
     setShowAuth(true)
   }, [])
 
-  // Direct open from MyPixels buttons (no post-auth callback needed)
-  const handleOpenAuth = useCallback((tab = 'login') => {
+  const handleOpenAuth = useCallback(() => {
     authCallbackRef.current = null
-    setShowAuthTab(tab)
     setShowAuth(true)
-  }, [])
-
-  const handleAuthSuccess = useCallback(() => {
-    setShowAuth(false)
-    useMapStore.getState().triggerZoomReset()
-    const cb = authCallbackRef.current
-    authCallbackRef.current = null
-    cb?.()
   }, [])
 
   const handleAuthClose = useCallback(() => {
@@ -178,11 +169,7 @@ export default function App() {
       <AudioLayer />
 
       {showAuth && (
-        <Auth
-          initialTab={showAuthTab}
-          onClose={handleAuthClose}
-          onSuccess={handleAuthSuccess}
-        />
+        <Auth onClose={handleAuthClose} />
       )}
     </div>
   )

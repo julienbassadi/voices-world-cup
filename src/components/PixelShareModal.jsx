@@ -198,7 +198,7 @@ export default function PixelShareModal({ pixel, country, commentCount = 0, onCl
             flexShrink: 0,
           }}>
             <div style={{ fontFamily: BEBAS, fontSize: 8, color: 'rgba(232,200,74,0.45)', letterSpacing: 3 }}>
-              VOICES WORLD CUP 2026
+              SUPPORTERS WORLD CUP 2026
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4,
               fontFamily: MONO, fontSize: 7, color: 'rgba(232,200,74,0.45)', letterSpacing: 1 }}>

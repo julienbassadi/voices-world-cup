@@ -84,7 +84,7 @@ export default function PixelPage({ pixelId }) {
   const handleShare = useCallback(async () => {
     const url = `${SITE}/pixel/${pixelId}`
     if (navigator.share) {
-      try { await navigator.share({ title: 'Voices World Cup 2026', url }); return } catch {}
+      try { await navigator.share({ title: 'Supporters World Cup 2026', url }); return } catch {}
     }
     try { await navigator.clipboard.writeText(url) } catch {
       const ta = Object.assign(document.createElement('textarea'), {
@@ -198,7 +198,7 @@ export default function PixelPage({ pixelId }) {
           flexShrink: 0,
         }}>
           <div style={{ fontFamily: BEBAS, fontSize: 10, color: 'rgba(232,200,74,0.45)', letterSpacing: 3.5 }}>
-            VOICES WORLD CUP 2026
+            SUPPORTERS WORLD CUP 2026
           </div>
           {/* Live dot */}
           <div style={{
