@@ -85,7 +85,7 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
   // ── Title block ──────────────────────────────────────────────────────────────
   const VWCTitle = ({ size = 20 }) => (
     <div style={{ fontFamily: BEBAS, fontSize: size, color: accent, letterSpacing: 3, lineHeight: 1, flexShrink: 0 }}>
-      SUPPORTERS WORLD CUP
+      SUPPORTERS WORLD CUP 2026
     </div>
   )
 
@@ -157,7 +157,7 @@ export default function HUD({ lastHoveredCountry, onOpenSidebar, onOpenVocalSpac
             >☰</button>
 
             <div style={{ fontFamily: BEBAS, fontSize: 11, letterSpacing: 2, color: accent, lineHeight: 1, flexShrink: 0 }}>
-              SUPPORTERS WORLD CUP
+              SUPPORTERS WORLD CUP 2026
             </div>
 
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>

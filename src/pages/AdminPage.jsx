@@ -357,7 +357,7 @@ export default function AdminPage() {
         width: 340, maxWidth: '92vw',
       }}>
         <div style={{ fontFamily: BEBAS, fontSize: 20, color: ACCENT, letterSpacing: 3 }}>
-          ADMIN — SUPPORTERS WORLD CUP
+          ADMIN — SUPPORTERS WORLD CUP 2026
         </div>
         <input
           type="password"
@@ -421,7 +421,7 @@ export default function AdminPage() {
         display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
       }}>
         <div style={{ fontFamily: BEBAS, fontSize: 18, color: ACCENT, letterSpacing: 3 }}>
-          ⚙ ADMIN — SUPPORTERS WORLD CUP
+          ⚙ ADMIN — SUPPORTERS WORLD CUP 2026
         </div>
         <div style={{ flex: 1 }} />
         <a href="/" style={{

@@ -117,7 +117,7 @@ export default function Auth({ onClose }) {
           fontFamily: BEBAS, fontSize: 13, color: accent,
           letterSpacing: 3, marginBottom: 20, opacity: 0.7,
         }}>
-          SUPPORTERS WORLD CUP
+          SUPPORTERS WORLD CUP 2026
         </div>
 
         {linkSent ? (
