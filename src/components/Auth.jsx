@@ -72,7 +72,8 @@ export default function Auth({ onClose }) {
     try {
       await sendMagicLink(email.trim())
       setLinkSent(true)
-    } catch {
+    } catch (err) {
+      console.error('[Auth] sendMagicLink error:', err)
       setError("Impossible d'envoyer le lien. Vérifie l'adresse email.")
     } finally {
       setLoading(false)
