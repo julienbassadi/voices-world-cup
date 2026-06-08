@@ -49,10 +49,7 @@ const useAuthStore = create((set, get) => ({
   },
 
   sendMagicLink: async (email) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: 'https://talktotheplanet.com' },
-    })
+    const { error } = await supabase.auth.signInWithOtp({ email })
     if (error) throw error
   },
 
