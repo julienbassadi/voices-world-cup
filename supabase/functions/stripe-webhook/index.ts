@@ -268,7 +268,10 @@ Deno.serve(async (req: Request) => {
       return new Response('Missing checkout_id', { status: 400 })
     }
 
-    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    // Service role client — bypasses RLS on all tables
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
 
     const { data: checkout, error: fetchErr } = await admin
       .from('pending_checkouts')
@@ -277,7 +280,7 @@ Deno.serve(async (req: Request) => {
       .single()
 
     if (fetchErr || !checkout) {
-      console.error('[stripe-webhook] checkout not found:', checkoutId, fetchErr?.message)
+      console.error('[stripe-webhook] checkout not found:', checkoutId, fetchErr?.code, fetchErr?.message)
       return new Response('Not found', { status: 404 })
     }
 
@@ -304,14 +307,18 @@ Deno.serve(async (req: Request) => {
       color:       px.color             ?? null,
     }))
 
+    console.log(`[stripe-webhook] inserting ${rows.length} row(s):`, JSON.stringify(rows[0]))
+
     const { data: insertedPixels, error: insertErr } = await admin
       .from('pixels')
       .insert(rows)
       .select('id')
 
     if (insertErr) {
-      console.error('[stripe-webhook] pixel insert error:', insertErr.message)
-      return new Response('DB error', { status: 500 })
+      console.error('[stripe-webhook] pixel insert error — code:', insertErr.code,
+        '| message:', insertErr.message, '| details:', insertErr.details,
+        '| hint:', insertErr.hint)
+      return new Response(`DB error: ${insertErr.message}`, { status: 500 })
     }
 
     await admin
