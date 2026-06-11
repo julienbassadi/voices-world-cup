@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import confetti from 'canvas-confetti'
 import useMapStore from '../store/mapStore'
 import useAuthStore from '../store/authStore'
 import { supabase } from '../lib/supabase'
@@ -216,14 +215,12 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
   const handleBack = () => setRecState('review')
 
   const handleCommit = async () => {
-    console.log('audioBlob:', audioBlobRef.current)
-    console.log('recState:', recState)
     if (!country || recState !== 'validated' || pendingCount === 0) {
       setUploadError('Conditions non remplies. Veuillez sélectionner des pixels et valider un enregistrement.')
       return
     }
     if (!audioBlobRef.current) {
-      setUploadError('Aucun enregistrement audio trouvé. Recommencez l\'enregistrement.')
+      setUploadError("Aucun enregistrement audio trouvé. Recommencez l'enregistrement.")
       return
     }
     if (!user?.id) {
@@ -238,49 +235,53 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
       // ── 1. Upload audio ──────────────────────────────────────────────────
       const ext  = audioBlobRef.current.type.includes('mp4') ? 'mp4' : 'webm'
       const path = `${user.id}/${country.iso}/${Date.now()}.${ext}`
-      console.log('Upload audio...', { path, size: audioBlobRef.current.size, type: audioBlobRef.current.type })
 
-      const { data: uploadData, error: uploadErr } = await supabase.storage
+      const { error: uploadErr } = await supabase.storage
         .from('audio')
         .upload(path, audioBlobRef.current, { contentType: audioBlobRef.current.type, upsert: false })
 
-      if (uploadErr) {
-        console.error('Erreur upload Supabase Storage:', uploadErr)
-        throw new Error(`Upload échoué : ${uploadErr.message}`)
+      if (uploadErr) throw new Error(`Upload échoué : ${uploadErr.message}`)
+
+      const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(path)
+
+      // ── 2. Build pixels array from pending selection ─────────────────────
+      const pixels = []
+      for (const key of useMapStore.getState().pendingGridPixels) {
+        if (!key.startsWith(`${country.iso}:`)) continue
+        const parts = key.split(':')
+        pixels.push({
+          iso:   parts[0],
+          gridX: parseInt(parts[1]),
+          gridY: parseInt(parts[2]),
+          color: selectedColor !== '#E8C84A' ? selectedColor : null,
+        })
       }
 
-      console.log('Upload réussi :', uploadData)
-      const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(path)
-      console.log('Upload réussi, URL :', publicUrl)
+      if (pixels.length === 0) throw new Error('Aucun pixel sélectionné.')
 
-      // ── 2. Insertion pixels ──────────────────────────────────────────────
-      console.log('Insertion pixels...')
-      await useMapStore.getState().commitGridPendingPixels({
-        audioUrl: publicUrl,
-        pseudo: pseudo.trim() || null,
-        description: description.trim() || null,
-        color: selectedColor !== '#E8C84A' ? selectedColor : null,
-      })
-      console.log('Pixels insérés avec succès')
-
-      confetti({
-        zIndex: 9999,
-        particleCount: 120,
-        spread: 80,
-        origin: { x: 0.5, y: 0.5 },
-        colors: ['#E8C84A', '#FFFFFF', '#c9a830', '#f5e080'],
-        startVelocity: 45,
-        gravity: 0.9,
-        scalar: 1.1,
+      // ── 3. Create Stripe Checkout Session via Edge Function ──────────────
+      const { data, error: fnErr } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          pixels,
+          audioUrl:    publicUrl,
+          pseudo:      pseudo.trim()       || null,
+          description: description.trim()  || null,
+          cancelUrl:   window.location.href,
+        },
       })
 
-      onClose()
+      if (fnErr) throw new Error(fnErr.message)
+      if (!data?.url) throw new Error('URL de paiement non reçue.')
+
+      // ── 4. Redirect to Stripe Checkout ───────────────────────────────────
+      window.location.href = data.url
+
     } catch (err) {
-      console.error('[Sidebar.handleCommit] Erreur complète :', err)
+      console.error('[Sidebar.handleCommit]', err)
       setUploadError(err.message ?? 'Erreur inconnue.')
-    } finally {
       setIsCommitting(false)
     }
+    // Note: isCommitting stays true while redirecting — intentional
   }
 
   if (!country) return null
@@ -633,7 +634,7 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
               borderRadius: 2, transition: 'all 0.25s', boxShadow: shadow,
             }}
           >
-            {isCommitting ? 'ENVOI EN COURS…' : 'CONFIRMER L\'ACHAT'}
+            {isCommitting ? 'REDIRECTION…' : 'CONFIRMER — PAIEMENT SÉCURISÉ'}
           </button>
         )}
       </div>
