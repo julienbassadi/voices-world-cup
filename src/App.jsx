@@ -14,6 +14,7 @@ export default function App() {
   const [selectedCountry, setSelectedCountry]   = useState(null) // country → recording sidebar
   const [lastHoveredCountry, setLastHoveredCountry] = useState(null)
   const [showAuth, setShowAuth]                 = useState(false)
+  const [authMode, setAuthMode]                 = useState('login')
   const [pixelView, setPixelView]               = useState(null) // { country, pixel }
   const [pendingHighlight, setPendingHighlight] = useState(null) // { gridX, gridY }
   const authCallbackRef                         = useRef(null)
@@ -99,13 +100,15 @@ export default function App() {
     setShowAuth(true)
   }, [])
 
-  const handleOpenAuth = useCallback(() => {
+  const handleOpenAuth = useCallback((mode = 'login') => {
     authCallbackRef.current = null
+    setAuthMode(mode)
     setShowAuth(true)
   }, [])
 
   const handleAuthClose = useCallback(() => {
     setShowAuth(false)
+    setAuthMode('login')
     authCallbackRef.current = null
   }, [])
 
@@ -169,7 +172,7 @@ export default function App() {
       <AudioLayer />
 
       {showAuth && (
-        <Auth onClose={handleAuthClose} />
+        <Auth mode={authMode} onClose={handleAuthClose} />
       )}
     </div>
   )

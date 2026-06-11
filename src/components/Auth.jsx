@@ -56,7 +56,7 @@ const mkPrimaryBtn = (isLight, disabled) => ({
   marginTop: 4,
 })
 
-export default function Auth({ onClose }) {
+export default function Auth({ onClose, mode = 'login' }) {
   const [email, setEmail]       = useState('')
   const [linkSent, setLinkSent] = useState(false)
   const [loading, setLoading]   = useState(false)
@@ -128,22 +128,28 @@ export default function Auth({ onClose }) {
               VÉRIFIE TA BOÎTE MAIL
             </div>
             <div style={{ fontFamily: MONO, color: mutedColor, fontSize: 11, letterSpacing: 0.5, lineHeight: 1.7 }}>
-              Un lien de connexion a été envoyé à
+              {mode === 'register'
+                ? 'Un lien de création de compte a été envoyé à'
+                : 'Un lien de connexion a été envoyé à'}
             </div>
             <div style={{ fontFamily: BEBAS, color: accent, fontSize: 15, letterSpacing: 1, marginTop: 6 }}>
               {email}
             </div>
             <div style={{ fontFamily: MONO, color: mutedColor, fontSize: 10, marginTop: 16, letterSpacing: 0.5, lineHeight: 1.6 }}>
-              Clique sur le lien dans l'email pour te connecter.
+              {mode === 'register'
+                ? 'Clique sur le lien pour activer ton compte.'
+                : 'Clique sur le lien dans l\'email pour te connecter.'}
             </div>
           </div>
         ) : (
           <>
             <div style={{ fontFamily: BEBAS, fontSize: 20, color: isLight ? '#0d1230' : '#e8e8e8', letterSpacing: 1, marginBottom: 6 }}>
-              CONNEXION
+              {mode === 'register' ? 'CRÉER UN COMPTE' : 'CONNEXION'}
             </div>
             <div style={{ fontFamily: MONO, fontSize: 10, color: mutedColor, letterSpacing: 0.5, lineHeight: 1.6, marginBottom: 20 }}>
-              Entre ton adresse email pour recevoir un lien de connexion instantané. Pas de mot de passe.
+              {mode === 'register'
+                ? 'Crée ton compte gratuitement avec ton adresse email. Tu recevras un lien magique, sans mot de passe.'
+                : 'Entre ton adresse email pour recevoir un lien de connexion instantané. Pas de mot de passe.'}
             </div>
 
             <Label text="EMAIL" color={mutedColor} />
@@ -168,7 +174,7 @@ export default function Auth({ onClose }) {
               disabled={!email.trim() || loading}
               style={mkPrimaryBtn(isLight, !email.trim() || loading)}
             >
-              {loading ? 'ENVOI...' : 'RECEVOIR MON LIEN DE CONNEXION'}
+              {loading ? 'ENVOI...' : mode === 'register' ? 'CRÉER MON COMPTE' : 'RECEVOIR MON LIEN DE CONNEXION'}
             </button>
           </>
         )}

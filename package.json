@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
+    "canvas-confetti": "^1.9.4",
     "d3": "^7.9.0",
     "flag-icons": "^7.5.0",
     "html2canvas": "^1.4.1",

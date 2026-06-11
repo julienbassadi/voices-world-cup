@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import confetti from 'canvas-confetti'
 import useMapStore from '../store/mapStore'
 import useAuthStore from '../store/authStore'
 import { supabase } from '../lib/supabase'
@@ -261,6 +262,16 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
         color: selectedColor !== '#E8C84A' ? selectedColor : null,
       })
       console.log('Pixels insérés avec succès')
+
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { x: 0.5, y: 0.5 },
+        colors: ['#E8C84A', '#FFFFFF', '#c9a830', '#f5e080'],
+        startVelocity: 45,
+        gravity: 0.9,
+        scalar: 1.1,
+      })
 
       onClose()
     } catch (err) {
