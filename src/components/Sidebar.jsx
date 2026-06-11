@@ -264,6 +264,7 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
       console.log('Pixels insérés avec succès')
 
       confetti({
+        zIndex: 9999,
         particleCount: 120,
         spread: 80,
         origin: { x: 0.5, y: 0.5 },
