@@ -156,6 +156,20 @@ const useMapStore = create((set, get) => ({
           }
         })
       })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'pixels' }, ({ old: p }) => {
+        set(state => {
+          const iso      = p.country_iso
+          const existing = state.pixelsByCountry[iso] ?? []
+          const filtered = existing.filter(px => px.id !== p.id)
+          const pbc      = { ...state.pixelsByCountry }
+          if (filtered.length > 0) pbc[iso] = filtered
+          else delete pbc[iso]
+          return {
+            totalVoices:     Math.max(0, state.totalVoices - 1),
+            pixelsByCountry: pbc,
+          }
+        })
+      })
       .subscribe()
     return () => supabase.removeChannel(channel)
   },

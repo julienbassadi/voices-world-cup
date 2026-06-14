@@ -24,13 +24,6 @@ const fmtShort = iso => iso
   ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
   : '—'
 
-function extractStoragePath(url) {
-  if (!url) return null
-  const marker = '/storage/v1/object/public/audio/'
-  const i = url.indexOf(marker)
-  return i >= 0 ? url.slice(i + marker.length) : null
-}
-
 // ── SVG bar chart (last 30 days) ──────────────────────────────────────────────
 function BarChart({ data }) {
   const max = Math.max(1, ...data.map(d => d.count))
@@ -128,25 +121,49 @@ function AudioBtn({ url }) {
 function DeleteBtn({ onDelete }) {
   const [confirming, setConfirming] = useState(false)
   const [loading, setLoading]       = useState(false)
+  const [err, setErr]               = useState(null)
+
+  const handleConfirm = async () => {
+    setLoading(true)
+    setErr(null)
+    try {
+      await onDelete()
+      setConfirming(false)
+    } catch (e) {
+      console.error('[AdminDeleteBtn]', e)
+      setErr(e.message ?? 'Erreur inconnue')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (confirming) return (
-    <span style={{ display: 'inline-flex', gap: 4 }}>
-      <button
-        onClick={async () => { setLoading(true); await onDelete(); setLoading(false) }}
-        disabled={loading}
-        style={{
-          background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.45)',
-          color: DANGER, fontSize: 10, padding: '3px 8px',
-          cursor: loading ? 'wait' : 'pointer', fontFamily: MONO, borderRadius: 2,
-        }}
-      >{loading ? '…' : '✓ OUI'}</button>
-      <button
-        onClick={() => setConfirming(false)}
-        style={{
-          background: 'none', border: '1px solid rgba(255,255,255,0.12)',
-          color: MUTED, fontSize: 10, padding: '3px 8px',
-          cursor: 'pointer', fontFamily: MONO, borderRadius: 2,
-        }}
-      >NON</button>
+    <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+      <span style={{ display: 'inline-flex', gap: 4 }}>
+        <button
+          onClick={handleConfirm}
+          disabled={loading}
+          style={{
+            background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.45)',
+            color: DANGER, fontSize: 10, padding: '3px 8px',
+            cursor: loading ? 'wait' : 'pointer', fontFamily: MONO, borderRadius: 2,
+          }}
+        >{loading ? '…' : '✓ OUI'}</button>
+        <button
+          onClick={() => { setConfirming(false); setErr(null) }}
+          disabled={loading}
+          style={{
+            background: 'none', border: '1px solid rgba(255,255,255,0.12)',
+            color: MUTED, fontSize: 10, padding: '3px 8px',
+            cursor: 'pointer', fontFamily: MONO, borderRadius: 2,
+          }}
+        >NON</button>
+      </span>
+      {err && (
+        <span style={{ fontFamily: MONO, fontSize: 9, color: DANGER, maxWidth: 180 }}>
+          ✗ {err}
+        </span>
+      )}
     </span>
   )
   return (
@@ -289,15 +306,19 @@ export default function AdminPage() {
 
   // ── Delete handlers ───────────────────────────────────────────────────────
   const handleDeletePixel = useCallback(async (pixel) => {
-    if (pixel.audio_url) {
-      const path = extractStoragePath(pixel.audio_url)
-      if (path) await supabase.storage.from('audio').remove([path])
-    }
-    await supabase.from('comments').delete().eq('pixel_id', pixel.id)
-    const { error } = await supabase.from('pixels').delete().eq('id', pixel.id)
-    if (error) throw new Error(error.message)
+    // Deletion runs via Edge Function so the service role key stays server-side
+    const { data, error } = await supabase.functions.invoke('admin-delete-pixel', {
+      body: { pixelId: pixel.id, adminPassword: ADMIN_PASSWORD },
+    })
+    if (error)      throw new Error(error.message)
+    if (data?.error) throw new Error(data.error)
+
     setPixels(prev => prev.filter(p => p.id !== pixel.id))
-    setStats(prev => prev ? { ...prev, totalPixels: prev.totalPixels - 1 } : prev)
+    setStats(prev => prev ? {
+      ...prev,
+      totalPixels:     prev.totalPixels - 1,
+      totalRecordings: pixel.audio_url ? prev.totalRecordings - 1 : prev.totalRecordings,
+    } : prev)
   }, [])
 
   const handleDeleteComment = useCallback(async (comment) => {
