@@ -55,17 +55,28 @@ const useMapStore = create((set, get) => ({
 
   // ── Grid pixels — modal 200×200 selection ─────────────────────────────────
   pendingGridPixels: new Set(),
+  pixelColors: {},
 
   toggleGridPixel: (iso, gx, gy) =>
     set(state => {
       const key  = `${iso}:${gx}:${gy}`
       const next = new Set(state.pendingGridPixels)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
+      if (next.has(key)) {
+        next.delete(key)
+        const newColors = { ...state.pixelColors }
+        delete newColors[key]
+        return { pendingGridPixels: next, pixelColors: newColors }
+      }
+      next.add(key)
       return { pendingGridPixels: next }
     }),
 
-  clearGridPendingPixels: () => set({ pendingGridPixels: new Set() }),
+  setPixelColor: (key, color) =>
+    set(state => ({ pixelColors: { ...state.pixelColors, [key]: color } })),
+
+  clearPixelColors: () => set({ pixelColors: {} }),
+
+  clearGridPendingPixels: () => set({ pendingGridPixels: new Set(), pixelColors: {} }),
 
   commitGridPendingPixels: async ({ audioUrl, pseudo, description, color } = {}) => {
     const { pendingGridPixels } = get()

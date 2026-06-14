@@ -52,6 +52,7 @@ export default function CountryModal({
   // ── Store ─────────────────────────────────────────────────────────────────
   const pixelsByCountry   = useMapStore(s => s.pixelsByCountry)
   const pendingGridPixels = useMapStore(s => s.pendingGridPixels)
+  const pixelColors       = useMapStore(s => s.pixelColors)
   const isLoggedIn        = useAuthStore(s => s.isLoggedIn)
 
   const countryPixels = pixelsByCountry[country?.iso] ?? []
@@ -123,7 +124,7 @@ export default function CountryModal({
             ctx.globalAlpha = 1
           }
         } else if (isPending) {
-          ctx.fillStyle   = '#E8C84A'
+          ctx.fillStyle   = pixelColors[`${country.iso}:${gx}:${gy}`] ?? '#E8C84A'
           ctx.globalAlpha = isHovered ? 0.8 : 0.5
           ctx.fillRect(cx, cy, sz, sz)
           ctx.globalAlpha = 1
@@ -163,7 +164,7 @@ export default function CountryModal({
         ctx.restore()
       }
     }
-  }, [pixelMap, pendingGridPixels, hoveredCell, country, transform, highlightPixel, pulsePhase])
+  }, [pixelMap, pendingGridPixels, pixelColors, hoveredCell, country, transform, highlightPixel, pulsePhase])
 
   // ── Wheel zoom (non-passive for preventDefault) ────────────────────────────
   useEffect(() => {

@@ -20,7 +20,6 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
   )
   const [pseudo, setPseudo]             = useState('')
   const [description, setDescription]   = useState('')
-  const [pixelColors, setPixelColors]   = useState({})
 
   const mediaRecorderRef = useRef(null)
   const streamRef        = useRef(null)
@@ -47,6 +46,8 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
 
   const pixelsByCountry   = useMapStore(s => s.pixelsByCountry)
   const pendingGridPixels = useMapStore(s => s.pendingGridPixels)
+  const pixelColors       = useMapStore(s => s.pixelColors)
+  const setPixelColor     = useMapStore(s => s.setPixelColor)
   const currentPixels     = (pixelsByCountry[country?.iso] ?? []).length
   const prefix            = `${country?.iso}:`
   let pendingCount        = 0
@@ -75,7 +76,7 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
     setUploadError(null)
     setPseudo('')
     setDescription('')
-    setPixelColors({})
+    useMapStore.getState().clearPixelColors()
     // Grid pixels cleared separately; confirmed stays visible on map after purchase
   }, [country?.iso])
 
@@ -246,10 +247,11 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
 
       // ── 2. Build pixels array from pending selection ─────────────────────
       const pixels = []
-      for (const key of useMapStore.getState().pendingGridPixels) {
+      const { pendingGridPixels: pending, pixelColors: colors } = useMapStore.getState()
+      for (const key of pending) {
         if (!key.startsWith(`${country.iso}:`)) continue
         const parts      = key.split(':')
-        const pixelColor = pixelColors[key] ?? '#E8C84A'
+        const pixelColor = colors[key] ?? '#E8C84A'
         pixels.push({
           iso:   parts[0],
           gridX: parseInt(parts[1]),
@@ -439,7 +441,7 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
                       <input
                         type="color"
                         value={color}
-                        onChange={e => setPixelColors(prev => ({ ...prev, [key]: e.target.value }))}
+                        onChange={e => setPixelColor(key, e.target.value)}
                         title={`Couleur du pixel ${gx}×${gy}`}
                         style={{
                           width: 28, height: 22, border: 'none', cursor: 'pointer',
