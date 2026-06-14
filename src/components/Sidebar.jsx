@@ -20,7 +20,7 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
   )
   const [pseudo, setPseudo]             = useState('')
   const [description, setDescription]   = useState('')
-  const [selectedColor, setSelectedColor] = useState('#E8C84A')
+  const [pixelColors, setPixelColors]   = useState({})
 
   const mediaRecorderRef = useRef(null)
   const streamRef        = useRef(null)
@@ -75,7 +75,7 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
     setUploadError(null)
     setPseudo('')
     setDescription('')
-    setSelectedColor('#E8C84A')
+    setPixelColors({})
     // Grid pixels cleared separately; confirmed stays visible on map after purchase
   }, [country?.iso])
 
@@ -248,12 +248,13 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
       const pixels = []
       for (const key of useMapStore.getState().pendingGridPixels) {
         if (!key.startsWith(`${country.iso}:`)) continue
-        const parts = key.split(':')
+        const parts      = key.split(':')
+        const pixelColor = pixelColors[key] ?? '#E8C84A'
         pixels.push({
           iso:   parts[0],
           gridX: parseInt(parts[1]),
           gridY: parseInt(parts[2]),
-          color: selectedColor !== '#E8C84A' ? selectedColor : null,
+          color: pixelColor !== '#E8C84A' ? pixelColor : null,
         })
       }
 
@@ -400,25 +401,58 @@ export default function Sidebar({ country, onClose, onNeedAuth, zIndex = 300 }) 
             resize: 'none', lineHeight: 1.5, marginBottom: 8,
           }}
         />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <input
-            type="color"
-            value={selectedColor}
-            onChange={e => setSelectedColor(e.target.value)}
-            title="Couleur du pixel"
-            style={{
-              width: 32, height: 26, border: 'none', cursor: 'pointer',
-              padding: 0, background: 'none', borderRadius: 2,
-            }}
-          />
-          <span style={{ fontFamily: MONO, fontSize: 9, color: mutedColor, letterSpacing: 1.5 }}>
-            COULEUR DU PIXEL
-          </span>
-          <div style={{
-            width: 12, height: 12, borderRadius: '50%', marginLeft: 'auto',
-            background: selectedColor, border: '1px solid rgba(255,255,255,0.25)', flexShrink: 0,
-          }} />
-        </div>
+        {pendingCount > 0 && (
+          <div>
+            <div style={{
+              fontFamily: MONO, fontSize: 9, color: mutedColor,
+              letterSpacing: 1.5, marginBottom: 6,
+            }}>
+              COULEURS DES PIXELS
+            </div>
+            <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+              {[...pendingGridPixels]
+                .filter(k => k.startsWith(prefix))
+                .map(key => {
+                  const parts = key.split(':')
+                  const gx    = parts[1]
+                  const gy    = parts[2]
+                  const color = pixelColors[key] ?? '#E8C84A'
+                  return (
+                    <div key={key} style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      marginBottom: 5, padding: '5px 8px',
+                      background: isLight ? 'rgba(30,58,138,0.04)' : 'rgba(255,255,255,0.04)',
+                      borderRadius: 2, border: `1px solid ${dividerClr}`,
+                    }}>
+                      <div style={{
+                        width: 10, height: 10, borderRadius: '50%',
+                        background: color, flexShrink: 0,
+                        border: '1px solid rgba(255,255,255,0.2)',
+                      }} />
+                      <span style={{
+                        fontFamily: MONO, fontSize: 10,
+                        color: isLight ? '#1a2040' : '#F0F0F0',
+                        flex: 1, letterSpacing: 0.5,
+                      }}>
+                        Pixel {gx}×{gy}
+                      </span>
+                      <input
+                        type="color"
+                        value={color}
+                        onChange={e => setPixelColors(prev => ({ ...prev, [key]: e.target.value }))}
+                        title={`Couleur du pixel ${gx}×${gy}`}
+                        style={{
+                          width: 28, height: 22, border: 'none', cursor: 'pointer',
+                          padding: 0, background: 'none', borderRadius: 2, flexShrink: 0,
+                        }}
+                      />
+                    </div>
+                  )
+                })
+              }
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{ height: 1, background: dividerClr, margin: isMobile ? '10px 20px 0' : '14px 28px 0' }} />
