@@ -195,6 +195,18 @@ export default function AdminPage() {
 
   const [voiceSearch, setVoiceSearch]     = useState('')
   const [commentSearch, setCommentSearch] = useState('')
+  const [userSearch, setUserSearch]       = useState('')
+  const [selectedUser, setSelectedUser]   = useState(null)
+
+  // Allow the page to scroll (global CSS sets overflow:hidden for the map)
+  useEffect(() => {
+    document.body.style.overflow = 'auto'
+    document.documentElement.style.overflow = 'auto'
+    return () => {
+      document.body.style.overflow = ''
+      document.documentElement.style.overflow = ''
+    }
+  }, [])
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   const handleLogin = () => {
@@ -331,6 +343,21 @@ export default function AdminPage() {
     const q = commentSearch.toLowerCase()
     return comments.filter(c => c.content.toLowerCase().includes(q))
   }, [comments, commentSearch])
+
+  const filteredUsers = useMemo(() => {
+    if (!userSearch) return users
+    const q = userSearch.toLowerCase()
+    return users.filter(u =>
+      (u.email      ?? '').toLowerCase().includes(q) ||
+      (u.first_name ?? '').toLowerCase().includes(q) ||
+      (u.last_name  ?? '').toLowerCase().includes(q)
+    )
+  }, [users, userSearch])
+
+  const userPixels = useMemo(() =>
+    selectedUser ? pixels.filter(p => p.user_id === selectedUser.id) : [],
+    [selectedUser, pixels]
+  )
 
   // ── Shared table styles ───────────────────────────────────────────────────
   const th = {
@@ -661,39 +688,149 @@ export default function AdminPage() {
 
           {/* ── USERS ── */}
           {tab === 'users' && (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
-                <thead>
-                  <tr>
-                    <th style={th}>Email</th>
-                    <th style={th}>Prénom</th>
-                    <th style={th}>Nom</th>
-                    <th style={th}>Pixels achetés</th>
-                    <th style={th}>Inscription</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((u, i) => (
-                    <tr key={u.id} style={{ background: i % 2 !== 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
-                      <td style={{ ...td, color: ACCENT }}>{u.email ?? '—'}</td>
-                      <td style={td}>{u.first_name ?? '—'}</td>
-                      <td style={td}>{u.last_name  ?? '—'}</td>
-                      <td style={{ ...td, fontFamily: BEBAS, fontSize: 16, color: pixelCountByUser[u.id] ? ACCENT : MUTED }}>
-                        {pixelCountByUser[u.id] ?? 0}
-                      </td>
-                      <td style={{ ...td, color: MUTED, fontSize: 9, whiteSpace: 'nowrap' }}>
-                        {fmtDate(u.created_at)}
-                      </td>
-                    </tr>
-                  ))}
-                  {users.length === 0 && (
-                    <tr><td colSpan={5} style={{ ...td, textAlign: 'center', padding: 40, color: MUTED }}>
-                      Aucun utilisateur
-                    </td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            selectedUser ? (
+              /* ── User detail view ── */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 900 }}>
+
+                {/* Back + user header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => setSelectedUser(null)}
+                    style={{
+                      background: 'none', border: `1px solid ${DIVIDER}`,
+                      color: MUTED, fontFamily: MONO, fontSize: 10,
+                      padding: '6px 12px', cursor: 'pointer', borderRadius: 2, letterSpacing: 1,
+                    }}
+                  >← RETOUR</button>
+                  <div>
+                    <div style={{ fontFamily: BEBAS, fontSize: 18, color: ACCENT, letterSpacing: 2, lineHeight: 1 }}>
+                      {selectedUser.email}
+                    </div>
+                    <div style={{ fontFamily: MONO, fontSize: 9, color: MUTED, marginTop: 3 }}>
+                      {[selectedUser.first_name, selectedUser.last_name].filter(Boolean).join(' ') || '—'}
+                      {' · '}inscrit le {fmtDate(selectedUser.created_at)}
+                      {' · '}{userPixels.length} pixel{userPixels.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pixels table */}
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+                    <thead>
+                      <tr>
+                        <th style={th}>Pays</th>
+                        <th style={th}>Pseudo</th>
+                        <th style={th}>Description</th>
+                        <th style={th}>Audio</th>
+                        <th style={th}>Date d'achat</th>
+                        <th style={th}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {userPixels.map((p, i) => {
+                        const country = QUALIFIED.find(c => c.iso === p.country_iso)
+                        return (
+                          <tr key={p.id} style={{ background: i % 2 !== 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
+                            <td style={td}>
+                              <span style={{ fontSize: 20, marginRight: 6 }}>{country?.flag ?? '🏳️'}</span>
+                              <span style={{ fontFamily: BEBAS, fontSize: 12, letterSpacing: 0.5 }}>
+                                {country?.name ?? p.country_iso.toUpperCase()}
+                              </span>
+                            </td>
+                            <td style={{ ...td, fontFamily: BEBAS, fontSize: 13, color: ACCENT, letterSpacing: 0.5 }}>
+                              {p.pseudo || <span style={{ color: MUTED, fontFamily: MONO, fontSize: 9 }}>—</span>}
+                            </td>
+                            <td style={{ ...td, maxWidth: 240, color: MUTED, fontSize: 9, lineHeight: 1.5 }}>
+                              {p.description
+                                ? <span title={p.description}>
+                                    {p.description.length > 100 ? p.description.slice(0, 100) + '…' : p.description}
+                                  </span>
+                                : '—'}
+                            </td>
+                            <td style={td}><AudioBtn url={p.audio_url} /></td>
+                            <td style={{ ...td, color: MUTED, fontSize: 9, whiteSpace: 'nowrap' }}>
+                              {fmtDate(p.created_at)}
+                            </td>
+                            <td style={td}>
+                              <DeleteBtn onDelete={async () => {
+                                await handleDeletePixel(p)
+                                // Stay on user detail but update local view via state
+                              }} />
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {userPixels.length === 0 && (
+                        <tr><td colSpan={6} style={{ ...td, textAlign: 'center', padding: 40, color: MUTED }}>
+                          Aucun pixel pour cet utilisateur
+                        </td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              /* ── User list ── */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <SearchInput
+                    value={userSearch}
+                    onChange={setUserSearch}
+                    placeholder="Filtrer par email ou nom…"
+                  />
+                  <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>
+                    {filteredUsers.length} / {users.length}
+                  </span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
+                    <thead>
+                      <tr>
+                        <th style={th}>Email</th>
+                        <th style={th}>Prénom</th>
+                        <th style={th}>Nom</th>
+                        <th style={th}>Pixels achetés</th>
+                        <th style={th}>Inscription</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.map((u, i) => {
+                        const count = pixelCountByUser[u.id] ?? 0
+                        return (
+                          <tr
+                            key={u.id}
+                            onClick={() => setSelectedUser(u)}
+                            style={{
+                              background: i % 2 !== 0 ? 'rgba(255,255,255,0.02)' : 'transparent',
+                              cursor: 'pointer',
+                              transition: 'background 0.1s',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(232,200,74,0.06)'}
+                            onMouseLeave={e => e.currentTarget.style.background = i % 2 !== 0 ? 'rgba(255,255,255,0.02)' : 'transparent'}
+                          >
+                            <td style={{ ...td, color: ACCENT }}>{u.email ?? '—'}</td>
+                            <td style={td}>{u.first_name ?? '—'}</td>
+                            <td style={td}>{u.last_name  ?? '—'}</td>
+                            <td style={{ ...td, fontFamily: BEBAS, fontSize: 16, color: count ? ACCENT : MUTED }}>
+                              {count}
+                            </td>
+                            <td style={{ ...td, color: MUTED, fontSize: 9, whiteSpace: 'nowrap' }}>
+                              {fmtDate(u.created_at)}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {filteredUsers.length === 0 && (
+                        <tr><td colSpan={5} style={{ ...td, textAlign: 'center', padding: 40, color: MUTED }}>
+                          Aucun utilisateur
+                        </td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
           )}
 
         </div>
