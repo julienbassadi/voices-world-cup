@@ -113,7 +113,9 @@ export default function CountryModal({
         const sz = CELL_SIZE - 0.5
 
         ctx.globalAlpha = 1
+
         if (px) {
+          // Purchased pixel — stored color
           ctx.fillStyle = px.color ?? '#E8C84A'
           ctx.fillRect(cx, cy, sz, sz)
           if (isHovered) {
@@ -124,16 +126,27 @@ export default function CountryModal({
             ctx.globalAlpha = 1
           }
         } else if (isPending) {
-          ctx.fillStyle   = pixelColors[`${country.iso}:${gx}:${gy}`] ?? '#E8C84A'
-          ctx.globalAlpha = isHovered ? 0.8 : 0.5
+          // Selected pixel — individual color + gold outline
+          const color = pixelColors[`${country.iso}:${gx}:${gy}`] ?? '#E8C84A'
+          ctx.globalAlpha = isHovered ? 1 : 0.85
+          ctx.fillStyle   = color
           ctx.fillRect(cx, cy, sz, sz)
           ctx.globalAlpha = 1
+          ctx.strokeStyle = '#E8C84A'
+          ctx.lineWidth   = 0.6 / scale
+          ctx.strokeRect(cx + 0.3 / scale, cy + 0.3 / scale, sz - 0.6 / scale, sz - 0.6 / scale)
         } else {
-          ctx.fillStyle = '#1a2a4a'
+          // Empty pixel — white fill, thin black border
+          ctx.fillStyle = '#ffffff'
           ctx.fillRect(cx, cy, sz, sz)
+          ctx.strokeStyle = '#000000'
+          ctx.lineWidth   = 0.3 / scale
+          ctx.globalAlpha = 0.25
+          ctx.strokeRect(cx + 0.15 / scale, cy + 0.15 / scale, sz - 0.3 / scale, sz - 0.3 / scale)
+          ctx.globalAlpha = 1
           if (isHovered) {
             ctx.fillStyle   = '#E8C84A'
-            ctx.globalAlpha = 0.3
+            ctx.globalAlpha = 0.35
             ctx.fillRect(cx, cy, sz, sz)
             ctx.globalAlpha = 1
           }
