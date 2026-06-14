@@ -8,6 +8,7 @@ import Auth from './components/Auth'
 import VocalSpace from './components/VocalSpace'
 import useMapStore from './store/mapStore'
 import useAuthStore from './store/authStore'
+import PaymentSuccess from './components/PaymentSuccess'
 
 export default function App() {
   const [countryModal, setCountryModal]         = useState(null) // country → pixel grid modal
@@ -174,6 +175,8 @@ export default function App() {
       {showAuth && (
         <Auth mode={authMode} onClose={handleAuthClose} />
       )}
+
+      <PaymentSuccess onNavigateToPixel={handleNavigateToPixel} />
     </div>
   )
 }
