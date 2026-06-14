@@ -262,6 +262,7 @@ Deno.serve(async (req: Request) => {
   if (event.type === 'checkout.session.completed') {
     const session    = event.data.object
     const checkoutId = session.metadata?.checkout_id as string | undefined
+    const metaUserId = session.metadata?.user_id   as string | undefined
 
     if (!checkoutId) {
       console.error('[stripe-webhook] missing checkout_id in metadata')
@@ -293,9 +294,17 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Insert pixels ────────────────────────────────────────────────────────
+    // Prefer user_id from Stripe metadata (set at checkout creation) as it
+    // survives even if pending_checkouts.user_id is somehow null.
+    const effectiveUserId = checkout.user_id ?? metaUserId ?? null
+    if (!effectiveUserId) {
+      console.error('[stripe-webhook] cannot resolve user_id for checkout', checkoutId)
+      return new Response('Missing user_id', { status: 400 })
+    }
+
     type PendingPixel = { iso: string; gridX: number; gridY: number; color: string | null }
     const rows = (checkout.pixels as PendingPixel[]).map(px => ({
-      user_id:     checkout.user_id,
+      user_id:     effectiveUserId,
       country_iso: px.iso,
       grid_x:      px.gridX,
       grid_y:      px.gridY,

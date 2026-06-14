@@ -83,6 +83,7 @@ Deno.serve(async (req: Request) => {
       'success_url':                               'https://talktotheplanet.com?payment=success',
       'cancel_url':                                cancelUrl ?? 'https://talktotheplanet.com',
       'metadata[checkout_id]':                     checkout.id,
+      'metadata[user_id]':                         user.id,
       'locale':                                    'fr',
     })
 
