@@ -30,12 +30,14 @@ export default function CountryModal({
   const dragRef         = useRef(null)
   const closeTimerRef   = useRef(null)
   const touchHandlerRef = useRef({}) // stable refs for touch handlers
+  const rafRef          = useRef(null)
 
   const [hoveredCell, setHoveredCell] = useState(null)
   const [tooltip, setTooltip]         = useState(null)
   const [isDragging, setIsDragging]   = useState(false)
   const [isClosing, setIsClosing]     = useState(false)
   const [pulsePhase, setPulsePhase]   = useState(0)
+  const [animTime, setAnimTime]       = useState(0)
   const [isLight, setIsLight]         = useState(
     () => document.documentElement.getAttribute('data-theme') === 'light'
   )
@@ -74,6 +76,11 @@ export default function CountryModal({
     return n
   }, [pendingGridPixels, country?.iso])
 
+  const hasAudioPixels = useMemo(
+    () => countryPixels.some(px => px.audioUrl),
+    [countryPixels]
+  )
+
   // ── Theme sync ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const obs = new MutationObserver(() =>
@@ -83,12 +90,30 @@ export default function CountryModal({
     return () => obs.disconnect()
   }, [])
 
+  // ── rAF loop for audio pulse animation ────────────────────────────────────
+  useEffect(() => {
+    if (!hasAudioPixels) return
+    let running = true
+    const tick = (ts) => {
+      if (!running) return
+      setAnimTime(ts)
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+    return () => {
+      running = false
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
+  }, [hasAudioPixels])
+
   // ── Canvas draw ───────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !country) return
     const ctx = canvas.getContext('2d')
     const { scale, offsetX, offsetY } = transform
+    // animTime read here to make the effect re-run each rAF frame
+    void animTime
 
     ctx.fillStyle = '#0a0f1e'
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
@@ -136,20 +161,49 @@ export default function CountryModal({
           ctx.lineWidth   = 0.6 / scale
           ctx.strokeRect(cx + 0.3 / scale, cy + 0.3 / scale, sz - 0.6 / scale, sz - 0.6 / scale)
         } else {
-          // Empty pixel — white fill, thin black border
-          ctx.fillStyle = '#ffffff'
+          // Empty pixel — white fill, light gray border
+          ctx.fillStyle   = '#ffffff'
           ctx.fillRect(cx, cy, sz, sz)
-          ctx.strokeStyle = '#000000'
-          ctx.lineWidth   = 0.3 / scale
-          ctx.globalAlpha = 0.25
-          ctx.strokeRect(cx + 0.15 / scale, cy + 0.15 / scale, sz - 0.3 / scale, sz - 0.3 / scale)
+          ctx.strokeStyle = '#e0e0e0'
+          ctx.lineWidth   = 0.5 / scale
           ctx.globalAlpha = 1
+          ctx.strokeRect(cx + 0.25 / scale, cy + 0.25 / scale, sz - 0.5 / scale, sz - 0.5 / scale)
           if (isHovered) {
             ctx.fillStyle   = '#E8C84A'
             ctx.globalAlpha = 0.35
             ctx.fillRect(cx, cy, sz, sz)
             ctx.globalAlpha = 1
           }
+        }
+      }
+    }
+
+    // Audio pulse rings — expanding waves from pixels with sound
+    if (animTime > 0) {
+      const t      = animTime / 1000  // seconds
+      const period = 2.5              // seconds per full cycle
+      const maxR   = CELL_SIZE * 2.2  // max ring radius in logical px
+
+      for (let gy = y0; gy <= y1; gy++) {
+        for (let gx = x0; gx <= x1; gx++) {
+          const apx = pixelMap.get(`${gx}:${gy}`)
+          if (!apx?.audioUrl) continue
+          const acx = gx * CELL_SIZE + CELL_SIZE / 2
+          const acy = gy * CELL_SIZE + CELL_SIZE / 2
+          const color = apx.color ?? '#E8C84A'
+          // 2 staggered rings
+          for (let r = 0; r < 2; r++) {
+            const phase  = ((t / period) + r * 0.5) % 1
+            const radius = phase * maxR
+            const alpha  = (1 - phase) * 0.55
+            ctx.beginPath()
+            ctx.arc(acx, acy, radius, 0, Math.PI * 2)
+            ctx.strokeStyle = color
+            ctx.lineWidth   = 0.6 / scale
+            ctx.globalAlpha = alpha
+            ctx.stroke()
+          }
+          ctx.globalAlpha = 1
         }
       }
     }
@@ -177,7 +231,7 @@ export default function CountryModal({
         ctx.restore()
       }
     }
-  }, [pixelMap, pendingGridPixels, pixelColors, hoveredCell, country, transform, highlightPixel, pulsePhase])
+  }, [pixelMap, pendingGridPixels, pixelColors, hoveredCell, country, transform, highlightPixel, pulsePhase, animTime])
 
   // ── Wheel zoom (non-passive for preventDefault) ────────────────────────────
   useEffect(() => {
