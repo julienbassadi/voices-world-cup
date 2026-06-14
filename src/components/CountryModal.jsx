@@ -10,6 +10,16 @@ const CELL_SIZE   = 3
 const CANVAS_SIZE = GRID_SIZE * CELL_SIZE  // 600px
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
+
+// Darken a hex color by `amount` (0–1)
+function darkenHex(hex, amount = 0.25) {
+  const c = hex.replace('#', '')
+  if (c.length !== 6) return hex
+  const r = Math.max(0, Math.floor(parseInt(c.slice(0, 2), 16) * (1 - amount)))
+  const g = Math.max(0, Math.floor(parseInt(c.slice(2, 4), 16) * (1 - amount)))
+  const b = Math.max(0, Math.floor(parseInt(c.slice(4, 6), 16) * (1 - amount)))
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
 const clampOffset = (offset, scale) => clamp(offset, CANVAS_SIZE * (1 - scale), 0)
 
 export default function CountryModal({
@@ -112,10 +122,10 @@ export default function CountryModal({
     if (!canvas || !country) return
     const ctx = canvas.getContext('2d')
     const { scale, offsetX, offsetY } = transform
-    // animTime read here to make the effect re-run each rAF frame
-    void animTime
+    void animTime  // trigger re-run each rAF frame
 
-    ctx.fillStyle = '#0a0f1e'
+    // White background
+    ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
 
     // Visible cell range (culling)
@@ -124,6 +134,12 @@ export default function CountryModal({
     const x1 = Math.min(GRID_SIZE - 1, Math.ceil((-offsetX + CANVAS_SIZE) / scale / CELL_SIZE))
     const y1 = Math.min(GRID_SIZE - 1, Math.ceil((-offsetY + CANVAS_SIZE) / scale / CELL_SIZE))
 
+    // Helpers: grid coords → screen coords
+    const toScreenX = gx => Math.round(gx * CELL_SIZE * scale + offsetX)
+    const toScreenY = gy => Math.round(gy * CELL_SIZE * scale + offsetY)
+    const cellPx    = Math.round(CELL_SIZE * scale)
+
+    // ── Phase 1: Cell fills (transformed space, no borders) ─────────────────
     ctx.save()
     ctx.translate(offsetX, offsetY)
     ctx.scale(scale, scale)
@@ -135,97 +151,122 @@ export default function CountryModal({
         const isHovered = hoveredCell?.gx === gx && hoveredCell?.gy === gy
         const cx = gx * CELL_SIZE
         const cy = gy * CELL_SIZE
-        const sz = CELL_SIZE - 0.5
-
-        ctx.globalAlpha = 1
 
         if (px) {
-          // Purchased pixel — stored color
-          ctx.fillStyle = px.color ?? '#E8C84A'
-          ctx.fillRect(cx, cy, sz, sz)
+          ctx.globalAlpha = 1
+          ctx.fillStyle   = px.color ?? '#E8C84A'
+          ctx.fillRect(cx, cy, CELL_SIZE, CELL_SIZE)
           if (isHovered) {
-            ctx.strokeStyle = '#ffffff'
-            ctx.lineWidth   = 0.5 / scale
-            ctx.globalAlpha = 0.8
-            ctx.strokeRect(cx + 0.25, cy + 0.25, sz - 0.5, sz - 0.5)
+            ctx.fillStyle   = '#ffffff'
+            ctx.globalAlpha = 0.22
+            ctx.fillRect(cx, cy, CELL_SIZE, CELL_SIZE)
             ctx.globalAlpha = 1
           }
         } else if (isPending) {
-          // Selected pixel — individual color + gold outline
           const color = pixelColors[`${country.iso}:${gx}:${gy}`] ?? '#E8C84A'
-          ctx.globalAlpha = isHovered ? 1 : 0.85
+          ctx.globalAlpha = 1
           ctx.fillStyle   = color
-          ctx.fillRect(cx, cy, sz, sz)
-          ctx.globalAlpha = 1
-          ctx.strokeStyle = '#E8C84A'
-          ctx.lineWidth   = 0.6 / scale
-          ctx.strokeRect(cx + 0.3 / scale, cy + 0.3 / scale, sz - 0.6 / scale, sz - 0.6 / scale)
+          ctx.fillRect(cx, cy, CELL_SIZE, CELL_SIZE)
         } else {
-          // Empty pixel — white fill, light gray border
-          ctx.fillStyle   = '#ffffff'
-          ctx.fillRect(cx, cy, sz, sz)
-          ctx.strokeStyle = '#e0e0e0'
-          ctx.lineWidth   = 0.5 / scale
-          ctx.globalAlpha = 1
-          ctx.strokeRect(cx + 0.25 / scale, cy + 0.25 / scale, sz - 0.5 / scale, sz - 0.5 / scale)
+          // Empty — white background already covers it; only draw hover tint
           if (isHovered) {
             ctx.fillStyle   = '#E8C84A'
-            ctx.globalAlpha = 0.35
-            ctx.fillRect(cx, cy, sz, sz)
+            ctx.globalAlpha = 0.22
+            ctx.fillRect(cx, cy, CELL_SIZE, CELL_SIZE)
             ctx.globalAlpha = 1
           }
-        }
-      }
-    }
-
-    // Audio pulse rings — expanding waves from pixels with sound
-    if (animTime > 0) {
-      const t      = animTime / 1000  // seconds
-      const period = 2.5              // seconds per full cycle
-      const maxR   = CELL_SIZE * 2.2  // max ring radius in logical px
-
-      for (let gy = y0; gy <= y1; gy++) {
-        for (let gx = x0; gx <= x1; gx++) {
-          const apx = pixelMap.get(`${gx}:${gy}`)
-          if (!apx?.audioUrl) continue
-          const acx = gx * CELL_SIZE + CELL_SIZE / 2
-          const acy = gy * CELL_SIZE + CELL_SIZE / 2
-          const color = apx.color ?? '#E8C84A'
-          // 2 staggered rings
-          for (let r = 0; r < 2; r++) {
-            const phase  = ((t / period) + r * 0.5) % 1
-            const radius = phase * maxR
-            const alpha  = (1 - phase) * 0.55
-            ctx.beginPath()
-            ctx.arc(acx, acy, radius, 0, Math.PI * 2)
-            ctx.strokeStyle = color
-            ctx.lineWidth   = 0.6 / scale
-            ctx.globalAlpha = alpha
-            ctx.stroke()
-          }
-          ctx.globalAlpha = 1
         }
       }
     }
 
     ctx.restore()
 
-    // Pulse ring over highlighted pixel
+    // ── Phase 2: Grid lines in screen coords — always 1px ───────────────────
+    {
+      const gsy0 = Math.max(0, toScreenY(y0))
+      const gsy1 = Math.min(CANVAS_SIZE, toScreenY(y1 + 1))
+      const gsx0 = Math.max(0, toScreenX(x0))
+      const gsx1 = Math.min(CANVAS_SIZE, toScreenX(x1 + 1))
+
+      ctx.save()
+      ctx.strokeStyle = '#e8e8e8'
+      ctx.lineWidth   = 1
+      ctx.beginPath()
+      for (let gx = x0; gx <= x1 + 1; gx++) {
+        const sx = toScreenX(gx) + 0.5
+        if (sx < 0 || sx > CANVAS_SIZE) continue
+        ctx.moveTo(sx, gsy0)
+        ctx.lineTo(sx, gsy1)
+      }
+      for (let gy = y0; gy <= y1 + 1; gy++) {
+        const sy = toScreenY(gy) + 0.5
+        if (sy < 0 || sy > CANVAS_SIZE) continue
+        ctx.moveTo(gsx0, sy)
+        ctx.lineTo(gsx1, sy)
+      }
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    // ── Phase 3: Selected pixel outlines — 1.5px, darker shade ─────────────
+    ctx.save()
+    ctx.lineWidth = 1.5
+    for (let gy = y0; gy <= y1; gy++) {
+      for (let gx = x0; gx <= x1; gx++) {
+        if (!pendingGridPixels.has(`${country.iso}:${gx}:${gy}`)) continue
+        const color = pixelColors[`${country.iso}:${gx}:${gy}`] ?? '#E8C84A'
+        const sx = toScreenX(gx)
+        const sy = toScreenY(gy)
+        ctx.strokeStyle = darkenHex(color, 0.28)
+        ctx.strokeRect(sx + 0.75, sy + 0.75, cellPx - 1.5, cellPx - 1.5)
+      }
+    }
+    ctx.restore()
+
+    // ── Phase 4: Audio pulse rings in screen coords ──────────────────────────
+    if (animTime > 0) {
+      const t      = animTime / 1000
+      const period = 2.5
+      const maxR   = cellPx * 2.2
+
+      ctx.save()
+      for (let gy = y0; gy <= y1; gy++) {
+        for (let gx = x0; gx <= x1; gx++) {
+          const apx = pixelMap.get(`${gx}:${gy}`)
+          if (!apx?.audioUrl) continue
+          const acx   = toScreenX(gx) + cellPx / 2
+          const acy   = toScreenY(gy) + cellPx / 2
+          const color = apx.color ?? '#E8C84A'
+          for (let r = 0; r < 2; r++) {
+            const phase  = ((t / period) + r * 0.5) % 1
+            const radius = phase * maxR
+            const alpha  = (1 - phase) * 0.5
+            ctx.beginPath()
+            ctx.arc(acx, acy, radius, 0, Math.PI * 2)
+            ctx.strokeStyle = color
+            ctx.lineWidth   = 1
+            ctx.globalAlpha = alpha
+            ctx.stroke()
+          }
+        }
+      }
+      ctx.globalAlpha = 1
+      ctx.restore()
+    }
+
+    // ── Phase 5: Highlight pulse ring for "Mes Pixels" navigation ───────────
     if (highlightPixel && pulsePhase > 0) {
       const { gridX, gridY } = highlightPixel
       if (gridX >= x0 && gridX <= x1 && gridY >= y0 && gridY <= y1) {
-        const { scale, offsetX, offsetY } = transform
+        const sx = toScreenX(gridX)
+        const sy = toScreenY(gridY)
         ctx.save()
-        ctx.translate(offsetX, offsetY)
-        ctx.scale(scale, scale)
-        const hx = gridX * CELL_SIZE
-        const hy = gridY * CELL_SIZE
         ctx.strokeStyle = '#E8C84A'
-        ctx.lineWidth   = 2 / scale
+        ctx.lineWidth   = 2
         ctx.globalAlpha = pulsePhase
         ctx.shadowColor = '#E8C84A'
-        ctx.shadowBlur  = 8 / scale
-        ctx.strokeRect(hx - 1.5 / scale, hy - 1.5 / scale, CELL_SIZE + 3 / scale, CELL_SIZE + 3 / scale)
+        ctx.shadowBlur  = 8
+        ctx.strokeRect(sx - 2, sy - 2, cellPx + 4, cellPx + 4)
         ctx.shadowBlur  = 0
         ctx.globalAlpha = 1
         ctx.restore()
@@ -605,7 +646,7 @@ export default function CountryModal({
         </div>
 
         {/* ── Grid area ── */}
-        <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', background: '#0a0f1e' }}>
+        <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', background: '#f5f5f5' }}>
 
           {/* Canvas wrapper — maintains 1:1 aspect ratio, fills available space */}
           <div style={{
